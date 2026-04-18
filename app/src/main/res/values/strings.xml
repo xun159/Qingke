@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">青稞</string>
-    <string name="hint_input_message">输入消息…</string>
     <string name="send_message">发送消息</string>
+    <string name="upload_file">上传文件</string>
 </resources>

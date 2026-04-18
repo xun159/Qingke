@@ -19,7 +19,7 @@
         android:id="@+id/nav_ai_assistant"
         android:name="wlw231.cly.qingke.ui.ai.AIAssistantFragment"
         android:label="AI助手"
-        tools:layout="@layout/fragment_ai_assistant" />
+        tools:layout="@layout/activity_chat" />
     <fragment
         android:id="@+id/nav_pomodoro"
         android:name="wlw231.cly.qingke.ui.pomodoro.PomodoroFragment"

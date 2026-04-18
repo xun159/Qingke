@@ -5,7 +5,8 @@
     <!-- 添加网络权限（Socket 通信必需） -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -37,10 +38,7 @@
         <activity
             android:name=".RegisterActivity"
             android:exported="false" />
-        <activity
-            android:name=".ui.ai.AIAssistantFragment"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>
