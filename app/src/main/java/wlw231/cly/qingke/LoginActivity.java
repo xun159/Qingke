@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 
 public class LoginActivity extends AppCompatActivity {
 
-    private static final String SERVER_HOST = "10.0.2.2";
+    private static final String SERVER_HOST = "192.168.12.124";
     private static final int SERVER_PORT = 5050;
     private static final String PROTOCOL_PREFIX = "LOGIN|";
 
