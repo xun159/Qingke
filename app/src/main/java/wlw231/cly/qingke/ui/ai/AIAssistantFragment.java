@@ -28,10 +28,12 @@ import com.google.android.material.card.MaterialCardView;
 
 import org.apache.commons.io.IOUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -128,7 +130,7 @@ public class AIAssistantFragment extends Fragment {
 
     private String sendChatViaSocket(String userId, String message) {
         try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
-            socket.setSoTimeout(100000);
+            socket.setSoTimeout(0);  // 无限等待
 
             OutputStream out = socket.getOutputStream();
             byte[] msgBytes = message.getBytes(StandardCharsets.UTF_8);
@@ -137,30 +139,55 @@ public class AIAssistantFragment extends Fragment {
             out.write(msgBytes);
             out.flush();
 
+            // 读取响应头
             InputStream in = socket.getInputStream();
-            StringBuilder headerBuilder = new StringBuilder();
-            int ch;
-            while ((ch = in.read()) != -1 && ch != '\n') {
-                headerBuilder.append((char) ch);
+            String respHeader = readLine(in);
+            Log.d(TAG, "响应头: " + respHeader);
+
+            if (respHeader == null || respHeader.isEmpty()) {
+                Log.e(TAG, "响应头为空，可能服务端提前关闭连接");
+                return null;
             }
-            String respHeader = headerBuilder.toString();
+
             if (respHeader.startsWith("ANSWER|")) {
                 int ansLen = Integer.parseInt(respHeader.split("\\|")[1]);
-                byte[] ansBytes = new byte[ansLen];
-                int offset = 0;
-                while (offset < ansLen) {
-                    int read = in.read(ansBytes, offset, ansLen - offset);
-                    if (read == -1) break;
-                    offset += read;
-                }
-                return new String(ansBytes, StandardCharsets.UTF_8);
+                Log.d(TAG, "期望回答长度: " + ansLen);
+                byte[] ansBytes = readExact(in, ansLen);
+                String answer = new String(ansBytes, StandardCharsets.UTF_8);
+                Log.d(TAG, "实际回答长度: " + answer.length());
+                return answer;
             } else {
-                return respHeader;
+                Log.e(TAG, "未知响应头: " + respHeader);
+                return null;
             }
+        } catch (SocketTimeoutException e) {
+            Log.e(TAG, "Socket 超时", e);
+            return "服务响应超时，请稍后重试";
         } catch (IOException e) {
-            Log.e(TAG, "聊天通信失败", e);
+            Log.e(TAG, "IO 异常", e);
             return null;
         }
+    }
+
+    // 添加 readLine 和 readExact 方法（若之前未定义）
+    private String readLine(InputStream in) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        int ch;
+        while ((ch = in.read()) != -1 && ch != '\n') {
+            baos.write(ch);
+        }
+        return baos.toString(StandardCharsets.UTF_8.name());
+    }
+
+    private byte[] readExact(InputStream in, int length) throws IOException {
+        byte[] data = new byte[length];
+        int offset = 0;
+        while (offset < length) {
+            int read = in.read(data, offset, length - offset);
+            if (read == -1) break;
+            offset += read;
+        }
+        return data;
     }
 
     private void openFilePicker() {
