@@ -55,9 +55,9 @@ public class LoginActivity extends AppCompatActivity {
 
         btnLogin.setOnClickListener(v -> attemptLogin());
         btnForgotPassword.setOnClickListener(v ->
-                Toast.makeText(this, "忘记密码功能待实现", Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(LoginActivity.this, ForgetPSWActivity.class)));
         btnSignup.setOnClickListener(v ->
-                Toast.makeText(this, "立即注册功能待实现", Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(LoginActivity.this, RegisterActivity.class)));
     }
 
     private void attemptLogin() {
