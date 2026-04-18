@@ -103,6 +103,11 @@ public class LoginActivity extends AppCompatActivity {
                     if (cbRemember.isChecked()) {
                         saveEmailToPrefs(email);
                     }
+                    // 保存 user_id
+                    getSharedPreferences("login_prefs", MODE_PRIVATE)
+                            .edit()
+                            .putString("user_id", email)
+                            .apply();
                     // 跳转主界面
                     startActivity(new Intent(LoginActivity.this, MainActivity.class));
                     finish();

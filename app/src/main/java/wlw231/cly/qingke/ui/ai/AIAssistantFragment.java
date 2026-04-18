@@ -1,8 +1,13 @@
 package wlw231.cly.qingke.ui.ai;
 
+import android.app.Activity;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -21,6 +26,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
+import org.apache.commons.io.IOUtils;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -36,12 +43,14 @@ import wlw231.cly.qingke.R;
 public class AIAssistantFragment extends Fragment {
 
     private static final String TAG = "AIAssistantFragment";
-    private static final String SERVER_HOST = "192.168.12.124"; // 模拟器用，真机改为实际 IP
+    private static final String SERVER_HOST = "192.168.12.124"; // 真机需替换为实际 IP
     private static final int SERVER_PORT = 6000;
+    private static final int REQUEST_CODE_FILE = 100;
 
     private RecyclerView rvMessages;
     private EditText etMessage;
     private MaterialButton btnSend;
+    private MaterialButton btnUploadFile;
     private ChatAdapter adapter;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -52,7 +61,6 @@ public class AIAssistantFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 从 SharedPreferences 获取用户 ID
         userId = requireActivity().getSharedPreferences("login_prefs", requireActivity().MODE_PRIVATE)
                 .getString("user_id", "user_123");
     }
@@ -61,7 +69,7 @@ public class AIAssistantFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.activity_chat, container, false);
+        return inflater.inflate(R.layout.fragment_ai_assistant, container, false);
     }
 
     @Override
@@ -74,6 +82,8 @@ public class AIAssistantFragment extends Fragment {
         rvMessages = root.findViewById(R.id.rvMessages);
         etMessage = root.findViewById(R.id.etMessage);
         btnSend = root.findViewById(R.id.btnSend);
+        btnUploadFile = root.findViewById(R.id.btnUploadFile);
+        MaterialButton btnClearChat = root.findViewById(R.id.btnClearChat);
 
         adapter = new ChatAdapter();
         rvMessages.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -83,6 +93,11 @@ public class AIAssistantFragment extends Fragment {
         adapter.addMessage(new ChatAdapter.Message("你好！我是 AI 助手，有什么可以帮你的？", false));
 
         btnSend.setOnClickListener(v -> sendMessage());
+        btnUploadFile.setOnClickListener(v -> openFilePicker());
+        btnClearChat.setOnClickListener(v -> {
+            adapter.clearMessages();
+            adapter.addMessage(new ChatAdapter.Message("聊天已清空，有什么新问题？", false));
+        });
     }
 
     private void sendMessage() {
@@ -93,6 +108,7 @@ public class AIAssistantFragment extends Fragment {
         etMessage.setText("");
         scrollToBottom();
 
+        // 占位消息
         adapter.addMessage(new ChatAdapter.Message("...", false));
         int loadingPos = adapter.getItemCount() - 1;
 
@@ -112,7 +128,7 @@ public class AIAssistantFragment extends Fragment {
 
     private String sendChatViaSocket(String userId, String message) {
         try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
-            socket.setSoTimeout(10000);
+            socket.setSoTimeout(100000);
 
             OutputStream out = socket.getOutputStream();
             byte[] msgBytes = message.getBytes(StandardCharsets.UTF_8);
@@ -142,9 +158,91 @@ public class AIAssistantFragment extends Fragment {
                 return respHeader;
             }
         } catch (IOException e) {
-            Log.e(TAG, "Chat socket error", e);
+            Log.e(TAG, "聊天通信失败", e);
             return null;
         }
+    }
+
+    private void openFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(Intent.createChooser(intent, "选择文件"), REQUEST_CODE_FILE);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_FILE && resultCode == Activity.RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                String fileName = getFileName(uri);
+                adapter.addMessage(new ChatAdapter.Message("📎 上传文件: " + fileName, true));
+                uploadFile(uri, fileName);
+            }
+        }
+    }
+
+    private String getFileName(Uri uri) {
+        String result = "unknown";
+        if ("content".equals(uri.getScheme())) {
+            try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (index != -1) result = cursor.getString(index);
+                }
+            }
+        }
+        if ("unknown".equals(result)) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) result = result.substring(cut + 1);
+        }
+        return result;
+    }
+
+    private void uploadFile(Uri uri, String fileName) {
+        executor.execute(() -> {
+            try (InputStream in = requireContext().getContentResolver().openInputStream(uri);
+                 Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
+
+                if (in == null) {
+                    mainHandler.post(() -> adapter.addMessage(new ChatAdapter.Message("无法读取文件", false)));
+                    return;
+                }
+
+                byte[] fileBytes = IOUtils.toByteArray(in);
+                OutputStream out = socket.getOutputStream();
+                String header = "FILE|" + userId + "|" + fileName + "|" + fileBytes.length + "\n";
+                out.write(header.getBytes(StandardCharsets.UTF_8));
+                out.write(fileBytes);
+                out.flush();
+
+                InputStream socketIn = socket.getInputStream();
+                StringBuilder respBuilder = new StringBuilder();
+                int ch;
+                while ((ch = socketIn.read()) != -1 && ch != '\n') {
+                    respBuilder.append((char) ch);
+                }
+                String response = respBuilder.toString();
+
+                mainHandler.post(() -> {
+                    if (response.startsWith("FILE_SUCCESS")) {
+                        String[] parts = response.split("\\|");
+                        String msg = "✅ 文件上传成功，知识已存入图谱";
+                        if (parts.length >= 3) {
+                            msg += "（实体: " + parts[1] + "，关系: " + parts[2] + "）";
+                        }
+                        adapter.addMessage(new ChatAdapter.Message(msg, false));
+                    } else {
+                        adapter.addMessage(new ChatAdapter.Message("❌ 文件处理失败: " + response, false));
+                    }
+                });
+            } catch (IOException e) {
+                Log.e(TAG, "文件上传失败", e);
+                mainHandler.post(() -> adapter.addMessage(new ChatAdapter.Message("网络错误，文件上传失败", false)));
+            }
+        });
     }
 
     private void scrollToBottom() {
@@ -184,6 +282,11 @@ public class AIAssistantFragment extends Fragment {
             }
         }
 
+        public void clearMessages() {
+            messages.clear();
+            notifyDataSetChanged();
+        }
+
         @Override
         public int getItemCount() {
             return messages.size();
@@ -193,7 +296,7 @@ public class AIAssistantFragment extends Fragment {
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_message, parent, false);
+                    .inflate(R.layout.item_message_simple, parent, false);
             return new ViewHolder(view);
         }
 

@@ -5,15 +5,146 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_login_gradient">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- 顶部标题栏（与登录/注册页风格一致） -->
+    <LinearLayout
+        android:id="@+id/layoutHeader"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="AI助手"
-        android:textSize="24sp"
-        android:textColor="?attr/colorOnSurface"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="12dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="AI 助手"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnClearChat"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="清空"
+            android:textAppearance="?attr/textAppearanceLabelMedium" />
+
+    </LinearLayout>
+
+    <!-- 聊天消息卡片 -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardChat"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="4dp"
+        app:layout_constraintBottom_toTopOf="@id/layoutInput"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutHeader">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMessages"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="12dp" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- 底部输入区域 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutInput"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- 文件上传按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUploadFile"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="24dp"
+            app:icon="@android:drawable/ic_menu_upload"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="?attr/colorOnPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 输入框卡片 -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="2dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btnSend"
+            app:layout_constraintStart_toEndOf="@id/btnUploadFile"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <EditText
+                android:id="@+id/etMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@null"
+                android:hint="输入消息..."
+                android:inputType="textMultiLine"
+                android:maxLines="3"
+                android:minHeight="48dp"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 发送按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSend"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="24dp"
+            app:icon="@android:drawable/ic_menu_send"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="?attr/colorOnPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 装饰圆点 -->
+    <View
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:layout_marginEnd="-40dp"
+        android:layout_marginBottom="-40dp"
+        android:background="@drawable/bg_decor_dot"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

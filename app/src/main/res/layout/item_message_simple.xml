@@ -10,21 +10,22 @@
         android:id="@+id/cardUser"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="48dp"
+        android:layout_marginStart="40dp"
+        android:focusable="false"
         app:cardBackgroundColor="?attr/colorPrimary"
-        app:cardCornerRadius="18dp"
+        app:cardCornerRadius="16dp"
         app:cardElevation="2dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:visibility="gone">
+        app:layout_constraintTop_toTopOf="parent">
 
         <TextView
             android:id="@+id/tvUserMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxWidth="260dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="10dp"
+            android:maxLines="1000"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
             android:textColor="?attr/colorOnPrimary"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
@@ -35,9 +36,10 @@
         android:id="@+id/cardAssistant"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="48dp"
+        android:layout_marginEnd="40dp"
+        android:focusable="false"
         app:cardBackgroundColor="?attr/colorSurfaceVariant"
-        app:cardCornerRadius="18dp"
+        app:cardCornerRadius="16dp"
         app:cardElevation="2dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -47,8 +49,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxWidth="260dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="10dp"
+            android:maxLines="1000"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
