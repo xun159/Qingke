@@ -2,4 +2,5 @@
     <string name="app_name">青稞</string>
     <string name="send_message">发送消息</string>
     <string name="upload_file">上传文件</string>
+    <string name="profile_avatar">用户头像</string>
 </resources>

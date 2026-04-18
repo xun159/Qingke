@@ -174,8 +174,15 @@ public class RegisterActivity extends AppCompatActivity {
                 btnRegister.setText("注 册");
 
                 if ("REG_SUCCESS".equals(response)) {
+                    // ✅ 保存用户标识（邮箱作为 user_id）
+                    getSharedPreferences("login_prefs", MODE_PRIVATE)
+                            .edit()
+                            .putString("user_id", email)
+                            .putString("saved_email", email)   // 可选，用于记住账号
+                            .putString("username", username)   // 保存用户名，供个人页显示
+                            .apply();
+
                     Toast.makeText(RegisterActivity.this, "注册成功，请登录", Toast.LENGTH_LONG).show();
-                    // 返回登录页
                     startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
                     finish();
                 } else if ("EMAIL_EXISTS".equals(response)) {
