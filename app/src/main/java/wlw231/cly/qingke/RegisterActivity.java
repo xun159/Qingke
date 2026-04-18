@@ -21,7 +21,7 @@ import java.util.concurrent.Executors;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private static final String SERVER_HOST = "10.111.254.85"; // 模拟器使用，真机改为实际 IP
+    private static final String SERVER_HOST = "192.168.12.124"; // 模拟器使用，真机改为实际 IP
     private static final int SERVER_PORT = 5050;
 
     private TextInputEditText etUsername;

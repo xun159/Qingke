@@ -38,7 +38,7 @@
             android:name=".RegisterActivity"
             android:exported="false" />
         <activity
-            android:name=".ChatActivity"
+            android:name=".ui.ai.AIAssistantFragment"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
     </application>

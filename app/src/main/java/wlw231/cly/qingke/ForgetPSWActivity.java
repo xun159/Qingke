@@ -21,7 +21,7 @@ import java.util.concurrent.Executors;
 
 public class ForgetPSWActivity extends AppCompatActivity {
 
-    private static final String SERVER_HOST = "10.0.2.2"; // 模拟器用，真机改为实际IP
+    private static final String SERVER_HOST = "192.168.12.124"; // 模拟器用，真机改为实际IP
     private static final int SERVER_PORT = 5050;
 
     private TextInputEditText etEmail;
