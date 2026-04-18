@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -27,8 +28,6 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -42,9 +41,11 @@ public class PomodoroFragment extends Fragment {
     private ProgressBar progressBar;
     private MaterialButton btnStartPause;
     private MaterialButton btnReset;
-    private ChipGroup chipGroupDuration;
-    private Chip chip15, chip25, chip45;
     private MaterialButton btnCustomDuration;
+
+    // 三个快捷时长按钮
+    private MaterialButton btnDuration15, btnDuration25, btnDuration45;
+    private MaterialButton currentSelectedDurationBtn;
 
     private CountDownTimer countDownTimer;
     private boolean isRunning = false;
@@ -76,32 +77,33 @@ public class PomodoroFragment extends Fragment {
         progressBar = view.findViewById(R.id.progressBar);
         btnStartPause = view.findViewById(R.id.btnStartPause);
         btnReset = view.findViewById(R.id.btnReset);
-        chipGroupDuration = view.findViewById(R.id.chipGroupDuration);
-        chip15 = view.findViewById(R.id.chip15);
-        chip25 = view.findViewById(R.id.chip25);
-        chip45 = view.findViewById(R.id.chip45);
         btnCustomDuration = view.findViewById(R.id.btnCustomDuration);
+        btnDuration15 = view.findViewById(R.id.btnDuration15);
+        btnDuration25 = view.findViewById(R.id.btnDuration25);
+        btnDuration45 = view.findViewById(R.id.btnDuration45);
 
         // 系统服务
         vibrator = (Vibrator) requireContext().getSystemService(Context.VIBRATOR_SERVICE);
         notificationManager = (NotificationManager) requireContext().getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel();
 
-        // 默认选中25分钟
-        chip25.setChecked(true);
-        setDurationFromChip(chip25);
-        updateTimerText();
+        // 默认选中 25 分钟
+        currentSelectedDurationBtn = btnDuration25;
+        setDurationInternal(25);
+        updateDurationButtonsUI(btnDuration25);
 
-        // Chip 选择监听
-        chipGroupDuration.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (!checkedIds.isEmpty()) {
-                Chip selectedChip = group.findViewById(checkedIds.get(0));
-                setDurationFromChip(selectedChip);
-                if (!isRunning) {
-                    updateTimerText();
-                    progressBar.setProgress(100);
-                }
-            }
+        // 快捷时长点击监听
+        btnDuration15.setOnClickListener(v -> {
+            setDurationInternal(15);
+            updateDurationButtonsUI(btnDuration15);
+        });
+        btnDuration25.setOnClickListener(v -> {
+            setDurationInternal(25);
+            updateDurationButtonsUI(btnDuration25);
+        });
+        btnDuration45.setOnClickListener(v -> {
+            setDurationInternal(45);
+            updateDurationButtonsUI(btnDuration45);
         });
 
         // 开始/暂停
@@ -120,15 +122,33 @@ public class PomodoroFragment extends Fragment {
         btnCustomDuration.setOnClickListener(v -> showCustomDurationDialog());
     }
 
-    private void setDurationFromChip(Chip chip) {
-        if (chip == chip15) {
-            totalTimeInMillis = 15 * 60 * 1000;
-        } else if (chip == chip25) {
-            totalTimeInMillis = 25 * 60 * 1000;
-        } else if (chip == chip45) {
-            totalTimeInMillis = 45 * 60 * 1000;
-        }
+    private void setDurationInternal(int minutes) {
+        totalTimeInMillis = minutes * 60 * 1000L;
         timeLeftInMillis = totalTimeInMillis;
+        if (!isRunning) {
+            updateTimerText();
+            progressBar.setProgress(100);
+            tvStatus.setText(minutes + " 分钟");
+        }
+    }
+
+    /**
+     * 更新三个时长按钮的选中状态样式
+     */
+    private void updateDurationButtonsUI(MaterialButton selectedBtn) {
+        // 恢复上一个选中按钮为轮廓样式
+        if (currentSelectedDurationBtn != null) {
+            currentSelectedDurationBtn.setBackgroundTintList(ColorStateList.valueOf(
+                    ContextCompat.getColor(requireContext(), android.R.color.transparent)));
+            currentSelectedDurationBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary));
+            currentSelectedDurationBtn.setStrokeColorResource(R.color.primary);
+            currentSelectedDurationBtn.setStrokeWidth(2);
+        }
+        // 设置新选中按钮为填充样式
+        selectedBtn.setBackgroundTintList(ContextCompat.getColorStateList(requireContext(), R.color.primary));
+        selectedBtn.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
+        selectedBtn.setStrokeWidth(0);
+        currentSelectedDurationBtn = selectedBtn;
     }
 
     private void updateTimerText() {
@@ -188,13 +208,8 @@ public class PomodoroFragment extends Fragment {
         isRunning = false;
         btnStartPause.setText("开始");
 
-        int checkedId = chipGroupDuration.getCheckedChipId();
-        if (checkedId != View.NO_ID) {
-            Chip selectedChip = chipGroupDuration.findViewById(checkedId);
-            setDurationFromChip(selectedChip);
-        } else {
-            timeLeftInMillis = totalTimeInMillis;
-        }
+        // 重置为当前选中的时长（totalTimeInMillis 已保存）
+        timeLeftInMillis = totalTimeInMillis;
 
         updateTimerText();
         progressBar.setProgress(100);
@@ -232,7 +247,15 @@ public class PomodoroFragment extends Fragment {
                         return;
                     }
 
-                    chipGroupDuration.clearCheck();
+                    // 清除按钮选中状态（将三个按钮都设为轮廓样式）
+                    if (currentSelectedDurationBtn != null) {
+                        currentSelectedDurationBtn.setBackgroundTintList(ColorStateList.valueOf(
+                                ContextCompat.getColor(requireContext(), android.R.color.transparent)));
+                        currentSelectedDurationBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary));
+                        currentSelectedDurationBtn.setStrokeColorResource(R.color.primary);
+                        currentSelectedDurationBtn.setStrokeWidth(2);
+                        currentSelectedDurationBtn = null;
+                    }
 
                     totalTimeInMillis = minutes * 60 * 1000L;
                     timeLeftInMillis = totalTimeInMillis;
@@ -281,11 +304,10 @@ public class PomodoroFragment extends Fragment {
                     != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
                         REQUEST_NOTIFICATION_PERMISSION);
-                return; // 本次不发送通知
+                return;
             }
         }
 
-        // 发送通知
         NotificationCompat.Builder builder = new NotificationCompat.Builder(requireContext(), CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle("🍅 番茄钟完成")
@@ -303,7 +325,6 @@ public class PomodoroFragment extends Fragment {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(getContext(), "通知权限已授予，下次计时结束将正常提醒", Toast.LENGTH_SHORT).show();
             } else {
-                // 用户拒绝，提示并可引导到设置
                 showPermissionDeniedDialog();
             }
         }

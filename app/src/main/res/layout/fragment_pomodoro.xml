@@ -3,166 +3,155 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_login_gradient">
+    android:background="@drawable/bg_login_gradient"
+    android:paddingHorizontal="20dp"
+    android:paddingVertical="32dp">
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardTimer"
-        android:layout_width="0dp"
+    <!-- 标题 -->
+    <TextView
+        android:id="@+id/tvPomodoroTitle"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="32dp"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="48dp"
-        app:cardElevation="8dp"
+        android:text="🍅 番茄钟"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textColor="?attr/colorOnSurface"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent" />
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="32dp">
+    <!-- 时间显示 -->
+    <TextView
+        android:id="@+id/tvTimer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:fontFamily="monospace"
+        android:text="25:00"
+        android:textSize="80sp"
+        android:textColor="?attr/colorPrimary"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvPomodoroTitle" />
 
-            <!-- 标题 -->
-            <TextView
-                android:id="@+id/tvPomodoroTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🍅 番茄钟"
-                android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                android:textColor="?attr/colorOnSurface"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+    <!-- 状态标签 -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="准备就绪"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvTimer" />
 
-            <!-- 时间显示 -->
-            <TextView
-                android:id="@+id/tvTimer"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:fontFamily="monospace"
-                android:text="25:00"
-                android:textSize="72sp"
-                android:textColor="?attr/colorPrimary"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvPomodoroTitle" />
+    <!-- 进度条 -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="10dp"
+        android:layout_marginTop="32dp"
+        android:max="100"
+        android:progress="100"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvStatus" />
 
-            <!-- 状态标签 -->
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="准备就绪"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvTimer" />
+    <!-- 第一行：开始/暂停 + 重置（均分） -->
+    <LinearLayout
+        android:id="@+id/layoutActionButtons"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/progressBar">
 
-            <!-- 进度条 -->
-            <ProgressBar
-                android:id="@+id/progressBar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="0dp"
-                android:layout_height="8dp"
-                android:layout_marginTop="24dp"
-                android:max="100"
-                android:progress="100"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvStatus" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStartPause"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="开始"
+            android:textStyle="bold"
+            app:cornerRadius="28dp" />
 
-            <!-- 控制按钮组 -->
-            <LinearLayout
-                android:id="@+id/layoutButtons"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:gravity="center"
-                android:orientation="horizontal"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/progressBar">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReset"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="重置"
+            android:textStyle="bold"
+            app:cornerRadius="28dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnStartPause"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:text="开始"
-                    android:textStyle="bold"
-                    app:cornerRadius="28dp" />
+    </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnReset"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:text="重置"
-                    android:textStyle="bold"
-                    app:cornerRadius="28dp" />
+    <!-- 第二行：快捷时长按钮（均分） -->
+    <LinearLayout
+        android:id="@+id/layoutQuickDurations"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutActionButtons">
 
-            </LinearLayout>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDuration15"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="15 分钟"
+            android:textStyle="bold"
+            app:cornerRadius="24dp" />
 
-            <!-- 快捷时长选择 ChipGroup -->
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chipGroupDuration"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                app:checkedChip="@id/chip25"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/layoutButtons"
-                app:selectionRequired="true"
-                app:singleSelection="true">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDuration25"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="25 分钟"
+            android:textStyle="bold"
+            app:cornerRadius="24dp" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip15"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="15 分钟" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDuration45"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="45 分钟"
+            android:textStyle="bold"
+            app:cornerRadius="24dp" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip25"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="25 分钟" />
+    </LinearLayout>
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip45"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="45 分钟" />
-
-            </com.google.android.material.chip.ChipGroup>
-
-            <!-- 新增：自定义时长按钮 -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCustomDuration"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="16dp"
-                android:text="⚡ 自定义分钟"
-                app:cornerRadius="24dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/chipGroupDuration" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-    </com.google.android.material.card.MaterialCardView>
+    <!-- 第三行：自定义按钮（单独一行，撑满宽度） -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCustomDuration"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:layout_marginTop="24dp"
+        android:text="⚡ 自定义分钟"
+        android:textStyle="bold"
+        app:cornerRadius="28dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutQuickDurations" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
