@@ -3,31 +3,31 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/nav_home">
+    app:startDestination="@id/nav_plan">
 
     <fragment
-        android:id="@+id/nav_home"
-        android:name="com.example.yourapp.ui.home.HomeFragment"
-        android:label="首页"
-        tools:layout="@layout/fragment_home" />
+        android:id="@+id/nav_plan"
+        android:name="wlw231.cly.qingke.ui.plan.PlanFragment"
+        android:label="计划"
+        tools:layout="@layout/fragment_plan" />
     <fragment
-        android:id="@+id/nav_explore"
-        android:name="com.example.yourapp.ui.explore.ExploreFragment"
-        android:label="发现"
-        tools:layout="@layout/fragment_explore" />
+        android:id="@+id/nav_course"
+        android:name="wlw231.cly.qingke.ui.course.CourseFragment"
+        android:label="课程"
+        tools:layout="@layout/fragment_course" />
     <fragment
-        android:id="@+id/nav_message"
-        android:name="com.example.yourapp.ui.message.MessageFragment"
-        android:label="消息"
-        tools:layout="@layout/fragment_message" />
+        android:id="@+id/nav_ai_assistant"
+        android:name="wlw231.cly.qingke.ui.ai.AIAssistantFragment"
+        android:label="AI助手"
+        tools:layout="@layout/fragment_ai_assistant" />
+    <fragment
+        android:id="@+id/nav_pomodoro"
+        android:name="wlw231.cly.qingke.ui.pomodoro.PomodoroFragment"
+        android:label="番茄钟"
+        tools:layout="@layout/fragment_pomodoro" />
     <fragment
         android:id="@+id/nav_profile"
-        android:name="com.example.yourapp.ui.profile.ProfileFragment"
-        android:label="个人"
+        android:name="wlw231.cly.qingke.ui.profile.ProfileFragment"
+        android:label="我的"
         tools:layout="@layout/fragment_profile" />
-    <fragment
-        android:id="@+id/nav_settings"
-        android:name="com.example.yourapp.ui.settings.SettingsFragment"
-        android:label="设置"
-        tools:layout="@layout/fragment_settings" />
 </navigation>

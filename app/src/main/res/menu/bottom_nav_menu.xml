@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/nav_home"
-        android:icon="@drawable/ic_home"
-        android:title="首页" />
+        android:id="@+id/nav_plan"
+        android:icon="@drawable/ic_plan"
+        android:title="计划" />
     <item
-        android:id="@+id/nav_explore"
-        android:icon="@drawable/ic_explore"
-        android:title="发现" />
+        android:id="@+id/nav_course"
+        android:icon="@drawable/ic_course"
+        android:title="课程" />
     <item
-        android:id="@+id/nav_message"
-        android:icon="@drawable/ic_message"
-        android:title="消息" />
+        android:id="@+id/nav_ai_assistant"
+        android:icon="@drawable/ic_ai_assistant"
+        android:title="AI助手" />
+    <item
+        android:id="@+id/nav_pomodoro"
+        android:icon="@drawable/ic_pomodoro"
+        android:title="番茄钟" />
     <item
         android:id="@+id/nav_profile"
         android:icon="@drawable/ic_profile"
-        android:title="个人" />
-    <item
-        android:id="@+id/nav_settings"
-        android:icon="@drawable/ic_settings"
-        android:title="设置" />
+        android:title="我的" />
 </menu>
