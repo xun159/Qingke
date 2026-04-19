@@ -1,16 +1,25 @@
 package wlw231.cly.qingke;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,6 +34,8 @@ public class LoginActivity extends AppCompatActivity {
     private static final String SERVER_HOST = "192.168.12.124";
     private static final int SERVER_PORT = 5050;
     private static final String PROTOCOL_PREFIX = "LOGIN|";
+
+    private static final int REQUEST_NOTIFICATION_PERMISSION = 1001;
 
     // UI 组件
     private TextInputEditText etUsername;
@@ -41,8 +52,38 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);   // 布局文件名为 login.xml
 
+        // 首次启动时请求通知权限（Android 13+）
+        requestNotificationPermissionIfNeeded();
+
         initViews();
         loadSavedEmail();
+    }
+
+    /**
+     * 在应用启动时请求通知权限（Android 13+ 必须）
+     */
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        REQUEST_NOTIFICATION_PERMISSION);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "通知权限已授予", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "通知权限被拒绝", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void initViews() {
@@ -122,8 +163,6 @@ public class LoginActivity extends AppCompatActivity {
 
     /**
      * 通过 Socket 发送数据并接收响应
-     * @param data 要发送的字符串
-     * @return 服务器返回的响应，异常时返回 null
      */
     private String sendDataViaSocket(String data) {
         try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
@@ -163,9 +202,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * 保存邮箱到 SharedPreferences（记住账号）
-     */
     private void saveEmailToPrefs(String email) {
         getSharedPreferences("login_prefs", MODE_PRIVATE)
                 .edit()
@@ -173,9 +209,6 @@ public class LoginActivity extends AppCompatActivity {
                 .apply();
     }
 
-    /**
-     * 加载已保存的邮箱并自动填充
-     */
     private void loadSavedEmail() {
         SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
         String savedEmail = prefs.getString("saved_email", "");
@@ -188,6 +221,6 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        executor.shutdown();  // 释放线程池资源
+        executor.shutdown();
     }
 }

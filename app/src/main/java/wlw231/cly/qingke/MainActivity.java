@@ -7,7 +7,7 @@ import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-
+import wlw231.cly.qingke.utils.CourseReminderHelper;
 public class MainActivity extends AppCompatActivity {
 
     private NavController navController;
@@ -44,5 +44,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        CourseReminderHelper.rescheduleAllReminders(this);
     }
 }
