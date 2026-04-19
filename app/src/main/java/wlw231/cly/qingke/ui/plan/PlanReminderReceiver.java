@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -13,7 +14,7 @@ public class PlanReminderReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (context == null || intent == null) return; // ✅ 修复：添加空指针检查
+        if (context == null || intent == null) return;
 
         String planName = intent.getStringExtra("plan_name");
         if (planName == null) planName = "未知计划";
@@ -26,12 +27,14 @@ public class PlanReminderReceiver extends BroadcastReceiver {
         else qName = "🔴 重要且紧急";
 
         NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null) return; // ✅ 修复：添加空指针检查
+        if (manager == null) return;
 
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID, "计划开始提醒", NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("计划到达开始时间时自动提醒");
         channel.enableVibration(true);
+        channel.enableLights(true);
+        channel.setSound(null, null);
         manager.createNotificationChannel(channel);
 
         if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
@@ -40,10 +43,15 @@ public class PlanReminderReceiver extends BroadcastReceiver {
                     .setContentTitle("⏰ 计划即将开始")
                     .setContentText("「" + planName + "」\n" + qName)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setAutoCancel(true);
+                    .setAutoCancel(true)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL);
 
             NotificationManagerCompat.from(context).notify(
                     (int) System.currentTimeMillis(), builder.build());
+
+            Log.d("PlanReminder", "Notification sent for: " + planName);
+        } else {
+            Log.w("PlanReminder", "Notifications are disabled for this app");
         }
     }
 }

@@ -1,6 +1,5 @@
 package wlw231.cly.qingke.ui.plan;
 
-import android.app.AlertDialog;
 import android.app.AlarmManager;
 import android.app.Dialog;
 import android.app.PendingIntent;
@@ -24,7 +23,6 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,7 +32,6 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import wlw231.cly.qingke.R;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -44,6 +41,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+
+import wlw231.cly.qingke.R;
 
 public class PlanFragment extends Fragment {
 
@@ -68,7 +67,6 @@ public class PlanFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // ✅ 修复：添加空指针检查
         if (getContext() == null) {
             return;
         }
@@ -77,14 +75,12 @@ public class PlanFragment extends Fragment {
         gson = new Gson();
         alarmManager = (AlarmManager) requireContext().getSystemService(Context.ALARM_SERVICE);
 
-        // ✅ 修复：添加空指针检查
         q1List = view.findViewById(R.id.q1_list);
         q2List = view.findViewById(R.id.q2_list);
         q3List = view.findViewById(R.id.q3_list);
         q4List = view.findViewById(R.id.q4_list);
-        fabAdd = view.findViewById(R.id.fab_add);
 
-        // ✅ 修复：添加空指针检查
+        fabAdd = view.findViewById(R.id.fab_add);
         if (fabAdd != null) {
             fabAdd.setOnClickListener(v -> showAddDialog(null, 2));
         }
@@ -93,27 +89,31 @@ public class PlanFragment extends Fragment {
         refreshAllReminders();
     }
 
+    // ------------------------------------------------------------
+    // 渲染所有计划到对应象限列表
+    // ------------------------------------------------------------
     private void renderPlans() {
-        // ✅ 修复：添加空指针检查
         if (q1List == null || q2List == null || q3List == null || q4List == null || planList == null) {
             return;
         }
 
-        q1List.removeAllViews(); q2List.removeAllViews();
-        q3List.removeAllViews(); q4List.removeAllViews();
+        q1List.removeAllViews();
+        q2List.removeAllViews();
+        q3List.removeAllViews();
+        q4List.removeAllViews();
 
         for (PlanItem plan : planList) {
-            if (plan == null) continue; // 跳过空项
+            if (plan == null) continue;
 
             LinearLayout itemRow = new LinearLayout(requireContext());
             itemRow.setOrientation(LinearLayout.HORIZONTAL);
             itemRow.setGravity(Gravity.CENTER_VERTICAL);
-            itemRow.setPadding(0, dp(8), 0, dp(8));
+            itemRow.setPadding(0, dp(6), 0, dp(6));
 
             TextView statusDot = new TextView(requireContext());
             statusDot.setLayoutParams(new LinearLayout.LayoutParams(dp(10), dp(10)));
             statusDot.setBackground(createDotDrawable(plan.quadrant, plan.isCompleted));
-            statusDot.setPadding(0, 0, dp(10), 0);
+            statusDot.setPadding(0, 0, dp(8), 0);
             itemRow.addView(statusDot);
 
             TextView tvName = new TextView(requireContext());
@@ -157,8 +157,11 @@ public class PlanFragment extends Fragment {
         return d;
     }
 
+    // ------------------------------------------------------------
+    // 弹出菜单（详情/修改/删除）
+    // ------------------------------------------------------------
     private void showPopupMenu(View anchorView, PlanItem plan) {
-        if (plan == null) return; // ✅ 修复：添加空指针检查
+        if (plan == null) return;
 
         LinearLayout menuRoot = new LinearLayout(requireContext());
         menuRoot.setOrientation(LinearLayout.VERTICAL);
@@ -198,19 +201,18 @@ public class PlanFragment extends Fragment {
     }
 
     private void showDetailDialog(PlanItem plan) {
-        if (plan == null) return; // ✅ 修复：添加空指针检查
-
-        String msg = String.format(Locale.ROOT, "%s\n%s\n开始：%02d月%02d日 %02d:00\n结束：%02d月%02d日 %02d:00",
+        if (plan == null) return;
+        String msg = String.format(Locale.ROOT, "%s\n%s\n开始：%02d月%02d日 %02d:%02d\n结束：%02d月%02d日 %02d:%02d",
                 plan.name, getQuadrantName(plan.quadrant),
-                plan.startMonth, plan.startDay, plan.startHour,
-                plan.endMonth, plan.endDay, plan.endHour);
-        new AlertDialog.Builder(requireContext()).setTitle("详情").setMessage(msg).show();
+                plan.startMonth, plan.startDay, plan.startHour, plan.startMinute,
+                plan.endMonth, plan.endDay, plan.endHour, plan.endMinute);
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("详情").setMessage(msg).show();
     }
 
     private void confirmDelete(PlanItem plan) {
-        if (plan == null) return; // ✅ 修复：添加空指针检查
-
-        new AlertDialog.Builder(requireContext())
+        if (plan == null) return;
+        new android.app.AlertDialog.Builder(requireContext())
                 .setTitle("删除")
                 .setMessage("确定删除「" + plan.name + "」吗？")
                 .setPositiveButton("删除", (d, w) -> {
@@ -224,72 +226,106 @@ public class PlanFragment extends Fragment {
                 .show();
     }
 
+    // ------------------------------------------------------------
+    // 紧凑型添加/修改对话框（核心修改区域）
+    // ------------------------------------------------------------
     private void showAddDialog(PlanItem editPlan, int defaultQuadrant) {
         boolean isEdit = editPlan != null;
         Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Translucent_NoTitleBar);
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(20), dp(20), dp(20));
-        root.setBackground(createRoundBg(Color.WHITE, 16));
+        root.setPadding(dp(12), dp(8), dp(12), dp(8));
+        root.setBackground(createRoundBg(Color.WHITE, 12));
 
+        // 标题
         TextView title = new TextView(requireContext());
         title.setText(isEdit ? "修改计划" : "新建计划");
         title.setTextSize(16);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         title.setTextColor(0xFF2C3E50);
+        title.setPadding(0, 0, 0, dp(4));
         root.addView(title);
 
-        root.addView(createLabel("象限"));
+        // 象限标签
+        root.addView(createCompactLabel("象限"));
         Spinner spinner = new Spinner(requireContext());
         spinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"🔴 重要且紧急", "🟢 重要不紧急", "🟡 紧急不重要", "🔵 不重要不紧急"}));
+                new String[]{"重要且紧急", "重要不紧急", "紧急不重要", "不重要不紧急"}));
         spinner.setSelection(defaultQuadrant - 1);
-        spinner.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
+        spinner.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(32)));
         root.addView(spinner);
 
-        root.addView(createLabel("名称"));
-        EditText etName = createEditText(isEdit ? editPlan.name : "");
+        // 名称
+        root.addView(createCompactLabel("名称"));
+        EditText etName = new EditText(requireContext());
+        etName.setText(isEdit ? editPlan.name : "");
+        etName.setHint("输入计划名称");
+        etName.setSingleLine(true);
+        etName.setTextSize(13);
+        etName.setPadding(dp(8), dp(4), dp(8), dp(4));
+        etName.setBackground(createRoundBg(0xFFF8F8F8, 6, 0xFFDDDDDD));
+        etName.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(32)));
         root.addView(etName);
 
-        root.addView(createLabel("开始 (月/日 时)"));
-        LinearLayout startRow = createTimeRow(isEdit ? editPlan.startMonth : 1,
+        // 开始时间
+        root.addView(createCompactLabel("开始时间 (月/日 时:分)"));
+        LinearLayout startRow = createCompactTimeRow(
+                isEdit ? editPlan.startMonth : 1,
                 isEdit ? editPlan.startDay : 1,
-                isEdit ? editPlan.startHour : 9);
+                isEdit ? editPlan.startHour : 9,
+                isEdit ? editPlan.startMinute : 0);
         root.addView(startRow);
 
-        root.addView(createLabel("结束 (月/日 时)"));
-        LinearLayout endRow = createTimeRow(isEdit ? editPlan.endMonth : 1,
+        // 结束时间
+        root.addView(createCompactLabel("结束时间 (月/日 时:分)"));
+        LinearLayout endRow = createCompactTimeRow(
+                isEdit ? editPlan.endMonth : 1,
                 isEdit ? editPlan.endDay : 1,
-                isEdit ? editPlan.endHour : 18);
+                isEdit ? editPlan.endHour : 18,
+                isEdit ? editPlan.endMinute : 0);
         root.addView(endRow);
 
+        // 按钮行
         LinearLayout btnRow = new LinearLayout(requireContext());
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        Button btnCancel = createButton("取消", 0xFF999999, 0xFFF5F5F5);
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-        btnRow.addView(btnCancel); // ✅ 修复：btnCanc -> btnCancel，并移除多余的括号
+        btnRow.setPadding(0, dp(8), 0, 0);
 
-        Button btnOk = createButton(isEdit ? "保存" : "添加", 0xFFFFFFFF, 0xFF2C3E50);
+        Button btnCancel = createCompactButton("取消", 0xFF999999, 0xFFF5F5F5);
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        btnRow.addView(btnCancel);
+
+        Button btnOk = createCompactButton(isEdit ? "保存" : "添加", 0xFFFFFFFF, 0xFF2C3E50);
         btnOk.setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
             if (name.isEmpty()) return;
 
-            int sM = parseInt((EditText)startRow.getChildAt(0), 1);
-            int sD = parseInt((EditText)startRow.getChildAt(1), 1);
-            int sH = parseInt((EditText)startRow.getChildAt(2), 0);
-            int eM = parseInt((EditText)endRow.getChildAt(0), 1);
-            int eD = parseInt((EditText)endRow.getChildAt(1), 1);
-            int eH = parseInt((EditText)endRow.getChildAt(2), 0);
+            int sM = parseInt((EditText) startRow.getChildAt(0), 1);
+            int sD = parseInt((EditText) startRow.getChildAt(1), 1);
+            int sH = parseInt((EditText) startRow.getChildAt(2), 0);
+            int sMin = parseInt((EditText) startRow.getChildAt(3), 0);
+            int eM = parseInt((EditText) endRow.getChildAt(0), 1);
+            int eD = parseInt((EditText) endRow.getChildAt(1), 1);
+            int eH = parseInt((EditText) endRow.getChildAt(2), 0);
+            int eMin = parseInt((EditText) endRow.getChildAt(3), 0);
             int q = spinner.getSelectedItemPosition() + 1;
 
             if (isEdit) {
-                editPlan.name = name; editPlan.quadrant = q;
-                editPlan.startMonth=sM; editPlan.startDay=sD; editPlan.startHour=sH;
-                editPlan.endMonth=eM; editPlan.endDay=eD; editPlan.endHour=eH;
+                editPlan.name = name;
+                editPlan.quadrant = q;
+                editPlan.startMonth = sM;
+                editPlan.startDay = sD;
+                editPlan.startHour = sH;
+                editPlan.startMinute = sMin;
+                editPlan.endMonth = eM;
+                editPlan.endDay = eD;
+                editPlan.endHour = eH;
+                editPlan.endMinute = eMin;
             } else {
                 if (planList != null) {
-                    planList.add(new PlanItem(name, sM, sD, sH, eM, eD, eH, q));
+                    planList.add(new PlanItem(name, sM, sD, sH, sMin, eM, eD, eH, eMin, q));
                 }
             }
             savePlans();
@@ -299,7 +335,6 @@ public class PlanFragment extends Fragment {
         root.addView(btnRow);
 
         dialog.setContentView(root);
-        // ✅ 修复：安全设置窗口属性
         if (dialog.getWindow() != null) {
             WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
             lp.width = dp(280);
@@ -309,73 +344,100 @@ public class PlanFragment extends Fragment {
         etName.requestFocus();
     }
 
-    private LinearLayout createTimeRow(int m, int d, int h) {
+    // 紧凑型标签
+    private TextView createCompactLabel(String text) {
+        TextView tv = new TextView(requireContext());
+        tv.setText(text);
+        tv.setTextSize(12);
+        tv.setTextColor(0xFF666666);
+        tv.setPadding(0, dp(4), 0, dp(2));
+        return tv;
+    }
+
+    // 紧凑型时间输入行（月、日、时、分）
+    private LinearLayout createCompactTimeRow(int month, int day, int hour, int minute) {
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
-        int[] vals = {m, d, h};
-        for (int i = 0; i < 3; i++) {
-            EditText e = new EditText(requireContext());
-            e.setText(String.valueOf(vals[i]));
-            e.setTextSize(12);
-            e.setGravity(Gravity.CENTER);
-            e.setIncludeFontPadding(false);
-            e.setPadding(0, 0, 0, 0);
-            e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-            e.setTextColor(0xFF2C3E50);
-            e.setBackground(createRoundBg(0xFFF8F8F8, 6, 0xFFDDDDDD));
-            e.setLayoutParams(new LinearLayout.LayoutParams(0, dp(34), 1));
-            row.addView(e);
-        }
+        row.setPadding(0, 0, 0, 0);
+
+        row.addView(createCompactTimeEdit(String.valueOf(month)));
+        row.addView(createCompactTimeEdit(String.valueOf(day)));
+        row.addView(createCompactTimeEdit(String.valueOf(hour)));
+        row.addView(createCompactTimeEdit(String.valueOf(minute)));
         return row;
     }
 
-    // ================= 定时提醒逻辑 =================
-    private void scheduleReminder(PlanItem plan) {
-        if (plan == null || plan.isCompleted || alarmManager == null || plan.id == null) return; // ✅ 修复：检查 plan.id 是否为 null
+    private EditText createCompactTimeEdit(String value) {
+        EditText et = new EditText(requireContext());
+        et.setText(value);
+        et.setTextSize(12);
+        et.setGravity(Gravity.CENTER);
+        et.setPadding(0, dp(2), 0, dp(2));
+        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        et.setTextColor(0xFF2C3E50);
+        et.setBackground(createRoundBg(0xFFF8F8F8, 4, 0xFFDDDDDD));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(24), 1);
+        lp.setMargins(dp(2), 0, dp(2), 0);
+        et.setLayoutParams(lp);
+        return et;
+    }
 
+    private Button createCompactButton(String text, int textColor, int bgColor) {
+        Button btn = new Button(requireContext());
+        btn.setText(text);
+        btn.setTextColor(textColor);
+        btn.setTextSize(13);
+        btn.setAllCaps(false);
+        btn.setBackground(createRoundBg(bgColor, 6, 0x00000000));
+        btn.setPadding(dp(4), dp(6), dp(4), dp(6));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+        btn.setLayoutParams(lp);
+        return btn;
+    }
+
+    // ------------------------------------------------------------
+    // 定时提醒相关（保持不变）
+    // ------------------------------------------------------------
+    private void scheduleReminder(PlanItem plan) {
+        if (plan == null || plan.isCompleted || alarmManager == null || plan.id == null) return;
+
+        Calendar now = Calendar.getInstance();
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.MONTH, plan.startMonth - 1);
         cal.set(Calendar.DAY_OF_MONTH, plan.startDay);
         cal.set(Calendar.HOUR_OF_DAY, plan.startHour);
-        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.MINUTE, plan.startMinute);
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
 
-        if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
-            cal.add(Calendar.YEAR, 1);
+        if (cal.getTimeInMillis() <= now.getTimeInMillis()) {
+            cal.add(Calendar.DAY_OF_YEAR, 1);
         }
 
         Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
         intent.putExtra("plan_name", plan.name);
         intent.putExtra("plan_quadrant", plan.quadrant);
 
-        String idStr = plan.id;
-        int requestCode = idStr.hashCode();
-
+        int requestCode = plan.id.hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         try {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
-            saveScheduledId(idStr);
-        } catch (SecurityException e) {
-            // 忽略权限拦截
-        }
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+            saveScheduledId(plan.id);
+        } catch (SecurityException ignored) {}
     }
 
     private void cancelReminder(PlanItem plan) {
-        if (plan == null || alarmManager == null) return;
-        String idStr = plan.id;
-        int requestCode = idStr.hashCode();
-
+        if (plan == null || alarmManager == null || plan.id == null) return;
+        int requestCode = plan.id.hashCode();
         Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
         PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
                 PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-
         if (pi != null) {
             alarmManager.cancel(pi);
             pi.cancel();
-            removeScheduledId(idStr);
+            removeScheduledId(plan.id);
         }
     }
 
@@ -383,9 +445,7 @@ public class PlanFragment extends Fragment {
         clearAllScheduledReminders();
         if (planList != null) {
             for (PlanItem plan : planList) {
-                if (plan != null) { // ✅ 修复：检查计划是否为空
-                    scheduleReminder(plan);
-                }
+                if (plan != null) scheduleReminder(plan);
             }
         }
     }
@@ -395,7 +455,8 @@ public class PlanFragment extends Fragment {
         for (String idStr : ids) {
             int requestCode = idStr.hashCode();
             Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
-            PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+            PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
+                    PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
             if (pi != null) {
                 alarmManager.cancel(pi);
                 pi.cancel();
@@ -405,12 +466,14 @@ public class PlanFragment extends Fragment {
     }
 
     private void saveScheduledId(String id) {
+        if (id == null) return;
         Set<String> ids = getScheduledIds();
         ids.add(id);
         prefs.edit().putStringSet(KEY_SCHEDULED_IDS, ids).apply();
     }
 
     private void removeScheduledId(String id) {
+        if (id == null) return;
         Set<String> ids = getScheduledIds();
         ids.remove(id);
         prefs.edit().putStringSet(KEY_SCHEDULED_IDS, ids).apply();
@@ -420,9 +483,11 @@ public class PlanFragment extends Fragment {
         return prefs.getStringSet(KEY_SCHEDULED_IDS, new HashSet<>());
     }
 
-    // ================= 数据持久化 =================
+    // ------------------------------------------------------------
+    // 数据持久化
+    // ------------------------------------------------------------
     private void savePlans() {
-        if (planList != null && prefs != null && gson != null) { // ✅ 修复：添加空指针检查
+        if (planList != null && prefs != null && gson != null) {
             prefs.edit().putString(KEY_PLANS, gson.toJson(planList)).apply();
             refreshAllReminders();
             renderPlans();
@@ -430,53 +495,29 @@ public class PlanFragment extends Fragment {
     }
 
     private void loadPlans() {
-        if (prefs == null || gson == null) return; // ✅ 修复：添加空指针检查
-
+        if (prefs == null || gson == null) return;
         String json = prefs.getString(KEY_PLANS, null);
         planList = json != null ? gson.fromJson(json, new TypeToken<List<PlanItem>>(){}.getType()) : new ArrayList<>();
+        if (planList != null) {
+            for (PlanItem plan : planList) {
+                if (plan.id == null) plan.id = UUID.randomUUID().toString();
+            }
+        }
         renderPlans();
     }
 
-    // ================= 工具方法 =================
+    // ------------------------------------------------------------
+    // 辅助方法
+    // ------------------------------------------------------------
     private String getQuadrantName(int q) {
-        if (q == 1) return "🔴 重要且紧急";
-        if (q == 2) return "🟢 重要不紧急";
-        if (q == 3) return "🟡 紧急不重要";
-        return "🔵 不重要不紧急";
-    }
-
-    private TextView createLabel(String t) {
-        TextView tv = new TextView(requireContext());
-        tv.setText(t); tv.setTextSize(12); tv.setTextColor(0xFF999999);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, dp(12), 0, dp(4)); tv.setLayoutParams(lp); return tv;
-    }
-
-    private EditText createEditText(String hint) {
-        EditText et = new EditText(requireContext());
-        et.setHint(hint); et.setTextSize(12); et.setSingleLine(true);
-        et.setIncludeFontPadding(false);
-        et.setPadding(dp(10), 0, dp(10), 0);
-        et.setGravity(Gravity.CENTER_VERTICAL);
-        et.setTextColor(0xFF2C3E50); et.setHintTextColor(0xFFAAAAAA);
-        et.setBackground(createRoundBg(0xFFF8F8F8, 6, 0xFFDDDDDD));
-        et.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
-        return et;
-    }
-
-    private Button createButton(String t, int tc, int bc) {
-        Button b = new Button(requireContext());
-        b.setText(t); b.setTextColor(tc); b.setTextSize(13); b.setAllCaps(false);
-        b.setBackground(createRoundBg(bc, 6, 0x00000000));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
-        b.setLayoutParams(lp); return b;
+        if (q == 1) return "重要且紧急";
+        if (q == 2) return "重要不紧急";
+        if (q == 3) return "紧急不重要";
+        return "不重要不紧急";
     }
 
     private int dp(float dp) {
-        if (getResources() != null) { // ✅ 修复：添加空指针检查
-            return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, getResources().getDisplayMetrics());
-        }
-        return (int) dp; // 返回原始值作为备用
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, getResources().getDisplayMetrics());
     }
 
     private int parseInt(EditText e, int d) {
@@ -484,9 +525,7 @@ public class PlanFragment extends Fragment {
             if (e != null && e.getText() != null) {
                 return Integer.parseInt(e.getText().toString());
             }
-        } catch (Exception ex) {
-            // 忽略解析错误
-        }
+        } catch (Exception ignored) {}
         return d;
     }
 
@@ -505,20 +544,26 @@ public class PlanFragment extends Fragment {
         return d;
     }
 
+    // ------------------------------------------------------------
+    // 数据模型
+    // ------------------------------------------------------------
     public static class PlanItem {
         String id, name;
-        int startMonth, startDay, startHour, endMonth, endDay, endHour, quadrant;
+        int startMonth, startDay, startHour, startMinute;
+        int endMonth, endDay, endHour, endMinute;
+        int quadrant;
         boolean isCompleted;
 
-        public PlanItem(String n, int sM, int sD, int sH, int eM, int eD, int eH, int q) {
-            id = UUID.randomUUID().toString(); // 生成新的 ID
+        public PlanItem(String n, int sM, int sD, int sH, int sMin, int eM, int eD, int eH, int eMin, int q) {
+            id = UUID.randomUUID().toString();
             name = n;
-            startMonth=sM; startDay=sD; startHour=sH; endMonth=eM; endDay=eD; endHour=eH; quadrant=q;
+            startMonth = sM; startDay = sD; startHour = sH; startMinute = sMin;
+            endMonth = eM; endDay = eD; endHour = eH; endMinute = eMin;
+            quadrant = q;
         }
 
-        // 添加默认构造函数，用于 Gson 反序列化
-        public PlanItem() {
-            id = UUID.randomUUID().toString(); // 确保反序列化时也有 ID
+        public PlanItem(String n, int sM, int sD, int sH, int eM, int eD, int eH, int q) {
+            this(n, sM, sD, sH, 0, eM, eD, eH, 0, q);
         }
     }
 }
