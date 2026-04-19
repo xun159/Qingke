@@ -61,6 +61,9 @@
         <receiver
             android:name=".receiver.CourseReminderReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".ui.plan.PlanReminderReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".receiver.BootCompletedReceiver"

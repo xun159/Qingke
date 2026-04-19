@@ -9,7 +9,9 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -23,10 +25,10 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -67,9 +69,7 @@ public class PlanFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (getContext() == null) {
-            return;
-        }
+        if (getContext() == null) return;
 
         prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         gson = new Gson();
@@ -237,7 +237,6 @@ public class PlanFragment extends Fragment {
         root.setPadding(dp(12), dp(8), dp(12), dp(8));
         root.setBackground(createRoundBg(Color.WHITE, 12));
 
-        // 标题
         TextView title = new TextView(requireContext());
         title.setText(isEdit ? "修改计划" : "新建计划");
         title.setTextSize(16);
@@ -247,7 +246,6 @@ public class PlanFragment extends Fragment {
         title.setPadding(0, 0, 0, dp(4));
         root.addView(title);
 
-        // 象限标签
         root.addView(createCompactLabel("象限"));
         Spinner spinner = new Spinner(requireContext());
         spinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item,
@@ -257,7 +255,6 @@ public class PlanFragment extends Fragment {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(32)));
         root.addView(spinner);
 
-        // 名称
         root.addView(createCompactLabel("名称"));
         EditText etName = new EditText(requireContext());
         etName.setText(isEdit ? editPlan.name : "");
@@ -270,7 +267,6 @@ public class PlanFragment extends Fragment {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(32)));
         root.addView(etName);
 
-        // 开始时间
         root.addView(createCompactLabel("开始时间 (月/日 时:分)"));
         LinearLayout startRow = createCompactTimeRow(
                 isEdit ? editPlan.startMonth : 1,
@@ -279,7 +275,6 @@ public class PlanFragment extends Fragment {
                 isEdit ? editPlan.startMinute : 0);
         root.addView(startRow);
 
-        // 结束时间
         root.addView(createCompactLabel("结束时间 (月/日 时:分)"));
         LinearLayout endRow = createCompactTimeRow(
                 isEdit ? editPlan.endMonth : 1,
@@ -288,7 +283,6 @@ public class PlanFragment extends Fragment {
                 isEdit ? editPlan.endMinute : 0);
         root.addView(endRow);
 
-        // 按钮行
         LinearLayout btnRow = new LinearLayout(requireContext());
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setPadding(0, dp(8), 0, 0);
@@ -344,7 +338,6 @@ public class PlanFragment extends Fragment {
         etName.requestFocus();
     }
 
-    // 紧凑型标签
     private TextView createCompactLabel(String text) {
         TextView tv = new TextView(requireContext());
         tv.setText(text);
@@ -354,7 +347,6 @@ public class PlanFragment extends Fragment {
         return tv;
     }
 
-    // 紧凑型时间输入行（月、日、时、分）
     private LinearLayout createCompactTimeRow(int month, int day, int hour, int minute) {
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -396,22 +388,25 @@ public class PlanFragment extends Fragment {
     }
 
     // ------------------------------------------------------------
-    // 定时提醒相关（保持不变）
+    // 定时提醒相关
     // ------------------------------------------------------------
     private void scheduleReminder(PlanItem plan) {
         if (plan == null || plan.isCompleted || alarmManager == null || plan.id == null) return;
 
-        Calendar now = Calendar.getInstance();
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.MONTH, plan.startMonth - 1);
-        cal.set(Calendar.DAY_OF_MONTH, plan.startDay);
-        cal.set(Calendar.HOUR_OF_DAY, plan.startHour);
-        cal.set(Calendar.MINUTE, plan.startMinute);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
+        Calendar targetCal = Calendar.getInstance();
+        targetCal.set(Calendar.MONTH, plan.startMonth - 1);
+        targetCal.set(Calendar.DAY_OF_MONTH, plan.startDay);
+        targetCal.set(Calendar.HOUR_OF_DAY, plan.startHour);
+        targetCal.set(Calendar.MINUTE, plan.startMinute);
+        targetCal.set(Calendar.SECOND, 0);
+        targetCal.set(Calendar.MILLISECOND, 0);
 
-        if (cal.getTimeInMillis() <= now.getTimeInMillis()) {
-            cal.add(Calendar.DAY_OF_YEAR, 1);
+        long targetTime = targetCal.getTimeInMillis();
+        long currentTime = System.currentTimeMillis();
+
+        if (targetTime <= currentTime) {
+            targetCal.add(Calendar.DAY_OF_YEAR, 1);
+            targetTime = targetCal.getTimeInMillis();
         }
 
         Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
@@ -419,25 +414,51 @@ public class PlanFragment extends Fragment {
         intent.putExtra("plan_quadrant", plan.quadrant);
 
         int requestCode = plan.id.hashCode();
-        PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                requireContext(),
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
 
         try {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, targetTime, pendingIntent);
+                } else {
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, targetTime, pendingIntent);
+                    Toast.makeText(requireContext(),
+                            "建议在设置中允许“闹钟和提醒”权限，以确保准时通知",
+                            Toast.LENGTH_LONG).show();
+                }
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, targetTime, pendingIntent);
+            }
             saveScheduledId(plan.id);
-        } catch (SecurityException ignored) {}
+            Log.d("PlanFragment", "已设置提醒: " + plan.name + " 时间: " + targetCal.getTime());
+        } catch (SecurityException e) {
+            Log.e("PlanFragment", "设置提醒失败: " + e.getMessage());
+            Toast.makeText(requireContext(), "无法设置提醒，请检查权限", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void cancelReminder(PlanItem plan) {
         if (plan == null || alarmManager == null || plan.id == null) return;
+
         int requestCode = plan.id.hashCode();
         Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
-        PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
-                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-        if (pi != null) {
-            alarmManager.cancel(pi);
-            pi.cancel();
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                requireContext(),
+                requestCode,
+                intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent);
+            pendingIntent.cancel();
             removeScheduledId(plan.id);
+            Log.d("PlanFragment", "已取消提醒: " + plan.name);
         }
     }
 
@@ -445,7 +466,9 @@ public class PlanFragment extends Fragment {
         clearAllScheduledReminders();
         if (planList != null) {
             for (PlanItem plan : planList) {
-                if (plan != null) scheduleReminder(plan);
+                if (plan != null && !plan.isCompleted) {
+                    scheduleReminder(plan);
+                }
             }
         }
     }
@@ -455,8 +478,12 @@ public class PlanFragment extends Fragment {
         for (String idStr : ids) {
             int requestCode = idStr.hashCode();
             Intent intent = new Intent(requireContext(), PlanReminderReceiver.class);
-            PendingIntent pi = PendingIntent.getBroadcast(requireContext(), requestCode, intent,
-                    PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+            PendingIntent pi = PendingIntent.getBroadcast(
+                    requireContext(),
+                    requestCode,
+                    intent,
+                    PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
+            );
             if (pi != null) {
                 alarmManager.cancel(pi);
                 pi.cancel();
