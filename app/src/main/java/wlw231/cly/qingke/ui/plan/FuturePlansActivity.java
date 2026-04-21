@@ -2,17 +2,17 @@ package wlw231.cly.qingke.ui.plan;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,16 +21,17 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 import wlw231.cly.qingke.R;
 
-public class PlanFragment extends Fragment {
+public class FuturePlansActivity extends AppCompatActivity {
 
-    private RecyclerView rvQ1, rvQ2, rvQ3, rvQ4;
-    private PlanAdapter adapterQ1, adapterQ2, adapterQ3, adapterQ4;
+    private RecyclerView rvFuturePlans;
+    private FuturePlansAdapter adapter;
     private PlanDatabaseHelper dbHelper;
 
     private Calendar selectedStartCalendar = Calendar.getInstance();
@@ -38,107 +39,73 @@ public class PlanFragment extends Fragment {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
-    @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_plan, container, false);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_future_plans);
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setTitleTextColor(getResources().getColor(R.color.primary));
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);  // 显式禁用返回箭头
+            getSupportActionBar().setTitle("未来计划");
+        }
+
+        dbHelper = PlanDatabaseHelper.getInstance(this);
+
+        rvFuturePlans = findViewById(R.id.rvFuturePlans);
+        rvFuturePlans.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new FuturePlansAdapter();
+        adapter.setOnPlanLongClickListener(this::showPlanOptionsMenu);
+        rvFuturePlans.setAdapter(adapter);
+
+        loadFuturePlans();
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    private void loadFuturePlans() {
+        List<PlanEntity> allPlans = dbHelper.getAllPlansSync();
 
-        dbHelper = PlanDatabaseHelper.getInstance(requireContext());
+        Calendar todayStart = Calendar.getInstance();
+        todayStart.set(Calendar.HOUR_OF_DAY, 0);
+        todayStart.set(Calendar.MINUTE, 0);
+        todayStart.set(Calendar.SECOND, 0);
+        todayStart.set(Calendar.MILLISECOND, 0);
+        long minStart = todayStart.getTimeInMillis();
 
-        initRecyclerViews(view);
-        setupAddButtons(view);
-        observeTodayPlans();
-
-        // 右上角按钮：查看未来计划
-        view.findViewById(R.id.btnFuturePlans).setOnClickListener(v -> {
-            startActivity(new Intent(requireContext(), FuturePlansActivity.class));
-        });
-
-        // 首次加载数据
-        dbHelper.refreshTodayPlans();
-    }
-
-    private void initRecyclerViews(View view) {
-        rvQ1 = view.findViewById(R.id.rvQ1);
-        rvQ2 = view.findViewById(R.id.rvQ2);
-        rvQ3 = view.findViewById(R.id.rvQ3);
-        rvQ4 = view.findViewById(R.id.rvQ4);
-
-        adapterQ1 = new PlanAdapter();
-        adapterQ2 = new PlanAdapter();
-        adapterQ3 = new PlanAdapter();
-        adapterQ4 = new PlanAdapter();
-
-        // 设置长按监听
-        PlanAdapter.OnPlanLongClickListener longClickListener = this::showPlanOptionsMenu;
-        adapterQ1.setOnPlanLongClickListener(longClickListener);
-        adapterQ2.setOnPlanLongClickListener(longClickListener);
-        adapterQ3.setOnPlanLongClickListener(longClickListener);
-        adapterQ4.setOnPlanLongClickListener(longClickListener);
-
-        LinearLayoutManager layoutManager1 = new LinearLayoutManager(requireContext());
-        LinearLayoutManager layoutManager2 = new LinearLayoutManager(requireContext());
-        LinearLayoutManager layoutManager3 = new LinearLayoutManager(requireContext());
-        LinearLayoutManager layoutManager4 = new LinearLayoutManager(requireContext());
-
-        rvQ1.setLayoutManager(layoutManager1);
-        rvQ2.setLayoutManager(layoutManager2);
-        rvQ3.setLayoutManager(layoutManager3);
-        rvQ4.setLayoutManager(layoutManager4);
-
-        rvQ1.setAdapter(adapterQ1);
-        rvQ2.setAdapter(adapterQ2);
-        rvQ3.setAdapter(adapterQ3);
-        rvQ4.setAdapter(adapterQ4);
-    }
-
-    private void setupAddButtons(View view) {
-        view.findViewById(R.id.tvQ1Add).setOnClickListener(v -> showAddDialog(null, 1));
-        view.findViewById(R.id.tvQ2Add).setOnClickListener(v -> showAddDialog(null, 2));
-        view.findViewById(R.id.tvQ3Add).setOnClickListener(v -> showAddDialog(null, 3));
-        view.findViewById(R.id.tvQ4Add).setOnClickListener(v -> showAddDialog(null, 4));
-    }
-
-    private void observeTodayPlans() {
-        dbHelper.getTodayPlansLiveData().observe(getViewLifecycleOwner(), plans -> {
-            adapterQ1.setPlans(filterByQuadrant(plans, 1));
-            adapterQ2.setPlans(filterByQuadrant(plans, 2));
-            adapterQ3.setPlans(filterByQuadrant(plans, 3));
-            adapterQ4.setPlans(filterByQuadrant(plans, 4));
-        });
-    }
-
-    private List<PlanEntity> filterByQuadrant(List<PlanEntity> plans, int quadrant) {
-        List<PlanEntity> filtered = new ArrayList<>();
-        for (PlanEntity p : plans) {
-            if (p.quadrant == quadrant) {
-                filtered.add(p);
+        List<PlanEntity> futurePlans = new ArrayList<>();
+        for (PlanEntity plan : allPlans) {
+            if (plan.startTimeMillis >= minStart && !plan.isCompleted) {
+                futurePlans.add(plan);
             }
         }
-        return filtered;
+
+        Collections.sort(futurePlans, (p1, p2) -> Long.compare(p1.startTimeMillis, p2.startTimeMillis));
+
+        List<Object> items = new ArrayList<>();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String currentDate = "";
+        for (PlanEntity plan : futurePlans) {
+            String dateKey = dateFormat.format(new Date(plan.startTimeMillis));
+            if (!dateKey.equals(currentDate)) {
+                currentDate = dateKey;
+                items.add("------ " + currentDate + " ------");
+            }
+            items.add(plan);
+        }
+
+        adapter.submitList(items);
     }
 
-    // ---------- 长按菜单 ----------
+    // ---------- 长按菜单（与 PlanFragment 逻辑一致）----------
     private void showPlanOptionsMenu(PlanEntity plan) {
-        new MaterialAlertDialogBuilder(requireContext())
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(plan.name)
                 .setItems(new String[]{"查看详情", "编辑", "删除"}, (dialog, which) -> {
                     switch (which) {
-                        case 0:
-                            showPlanDetail(plan);
-                            break;
-                        case 1:
-                            showAddDialog(plan, plan.quadrant);
-                            break;
-                        case 2:
-                            confirmDeletePlan(plan);
-                            break;
+                        case 0: showPlanDetail(plan); break;
+                        case 1: showEditDialog(plan); break;
+                        case 2: confirmDeletePlan(plan); break;
                     }
                 })
                 .show();
@@ -154,21 +121,26 @@ public class PlanFragment extends Fragment {
                 "\n象限：" + quadrantName +
                 "\n开始：" + start +
                 "\n结束：" + end;
-        new MaterialAlertDialogBuilder(requireContext())
+        new MaterialAlertDialogBuilder(this)
                 .setTitle("计划详情")
                 .setMessage(message)
                 .setPositiveButton("关闭", null)
                 .show();
     }
 
+    private void showEditDialog(PlanEntity plan) {
+        showAddEditDialog(plan, plan.quadrant);
+    }
+
     private void confirmDeletePlan(PlanEntity plan) {
-        new MaterialAlertDialogBuilder(requireContext())
+        new MaterialAlertDialogBuilder(this)
                 .setTitle("删除计划")
                 .setMessage("确定要删除「" + plan.name + "」吗？")
                 .setPositiveButton("删除", (dialog, which) -> {
                     dbHelper.deletePlan(plan.id, () -> {
-                        requireActivity().runOnUiThread(() -> {
-                            Toast.makeText(requireContext(), "已删除", Toast.LENGTH_SHORT).show();
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+                            loadFuturePlans();
                         });
                     });
                 })
@@ -185,13 +157,13 @@ public class PlanFragment extends Fragment {
         }
     }
 
-    // ---------- 添加/编辑对话框 ----------
-    private void showAddDialog(PlanEntity editPlan, int defaultQuadrant) {
+    // ---------- 编辑对话框（复用添加布局）----------
+    private void showAddEditDialog(PlanEntity editPlan, int defaultQuadrant) {
         boolean isEdit = editPlan != null;
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_plan, null);
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_plan, null);
         builder.setView(dialogView);
-        final androidx.appcompat.app.AlertDialog dialog = builder.create();
+        final AlertDialog dialog = builder.create();
 
         TextView tvStartDate = dialogView.findViewById(R.id.tvStartDate);
         TextView tvStartTime = dialogView.findViewById(R.id.tvStartTime);
@@ -202,7 +174,7 @@ public class PlanFragment extends Fragment {
 
         String[] quadrants = {"重要且紧急", "重要不紧急", "紧急不重要", "不重要不紧急"};
         android.widget.ArrayAdapter<String> spinnerAdapter = new android.widget.ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_spinner_item, quadrants);
+                this, android.R.layout.simple_spinner_item, quadrants);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerQuadrant.setAdapter(spinnerAdapter);
 
@@ -215,7 +187,7 @@ public class PlanFragment extends Fragment {
             spinnerQuadrant.setSelection(defaultQuadrant - 1);
             selectedStartCalendar = Calendar.getInstance();
             selectedEndCalendar = Calendar.getInstance();
-            selectedEndCalendar.add(Calendar.HOUR_OF_DAY, 1); // 默认结束时间为1小时后
+            selectedEndCalendar.add(Calendar.HOUR_OF_DAY, 1);
         }
 
         updateDateTimeTexts(tvStartDate, tvStartTime, selectedStartCalendar);
@@ -234,7 +206,7 @@ public class PlanFragment extends Fragment {
         dialogView.findViewById(R.id.btnSave).setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
             if (name.isEmpty()) {
-                Toast.makeText(requireContext(), "请输入计划名称", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "请输入计划名称", Toast.LENGTH_SHORT).show();
                 return;
             }
             int quadrant = spinnerQuadrant.getSelectedItemPosition() + 1;
@@ -245,8 +217,9 @@ public class PlanFragment extends Fragment {
                 editPlan.startTimeMillis = selectedStartCalendar.getTimeInMillis();
                 editPlan.endTimeMillis = selectedEndCalendar.getTimeInMillis();
                 dbHelper.updatePlan(editPlan, () -> {
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "计划已更新", Toast.LENGTH_SHORT).show();
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "计划已更新", Toast.LENGTH_SHORT).show();
+                        loadFuturePlans();
                     });
                 });
             } else {
@@ -258,15 +231,14 @@ public class PlanFragment extends Fragment {
                 plan.isCompleted = false;
                 plan.notified = false;
                 dbHelper.insertPlan(plan, () -> {
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "计划已添加", Toast.LENGTH_SHORT).show();
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "计划已添加", Toast.LENGTH_SHORT).show();
+                        loadFuturePlans();
                     });
                 });
             }
 
             dialog.dismiss();
-
-            // 重置选择器
             selectedStartCalendar = Calendar.getInstance();
             selectedEndCalendar = Calendar.getInstance();
         });
@@ -280,7 +252,7 @@ public class PlanFragment extends Fragment {
     }
 
     private void showDatePicker(Calendar calendar, Runnable onDateSet) {
-        new DatePickerDialog(requireContext(),
+        new DatePickerDialog(this,
                 (view, year, month, day) -> {
                     calendar.set(Calendar.YEAR, year);
                     calendar.set(Calendar.MONTH, month);
@@ -293,7 +265,7 @@ public class PlanFragment extends Fragment {
     }
 
     private void showTimePicker(Calendar calendar, Runnable onTimeSet) {
-        new TimePickerDialog(requireContext(),
+        new TimePickerDialog(this,
                 (view, hour, minute) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, hour);
                     calendar.set(Calendar.MINUTE, minute);
@@ -302,5 +274,14 @@ public class PlanFragment extends Fragment {
                 calendar.get(Calendar.HOUR_OF_DAY),
                 calendar.get(Calendar.MINUTE),
                 true).show();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

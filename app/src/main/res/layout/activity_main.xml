@@ -10,7 +10,7 @@
         android:id="@+id/layoutBrand"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="15dp"
         android:gravity="center"
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
@@ -39,16 +39,14 @@
         android:id="@+id/cardContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginHorizontal="10dp"
-        android:layout_marginTop="0dp"
-        android:layout_marginBottom="0dp"
+        android:layout_marginHorizontal="0px"
         app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="28dp"
-        app:cardElevation="8dp"
+        app:cardCornerRadius="25dp"
+        app:cardElevation="10dp"
         app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/layoutBrand">
+        app:layout_constraintTop_toBottomOf="@+id/layoutBrand">
 
         <!-- Fragment 容器，用于动态切换页面 -->
         <androidx.fragment.app.FragmentContainerView

@@ -48,6 +48,10 @@
         <activity
             android:name=".RegisterActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.plan.FuturePlansActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Qingke" />
 
         <service
             android:name=".service.PomodoroService"
@@ -61,10 +65,11 @@
         <receiver
             android:name=".receiver.CourseReminderReceiver"
             android:exported="false" />
-        <receiver
-            android:name=".ui.plan.PlanReminderReceiver"
-            android:exported="false" />
-
+        <service
+            android:name=".ui.plan.PlanReminderService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
         <receiver
             android:name=".receiver.BootCompletedReceiver"
             android:exported="true"

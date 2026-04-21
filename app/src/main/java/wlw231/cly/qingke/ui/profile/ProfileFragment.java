@@ -99,7 +99,7 @@ public class ProfileFragment extends Fragment {
         prefs.edit()
                 .remove("user_id")
                 .remove("saved_email")
-//                .remove("username")
+                .remove("saved_password_hash") // 新增
                 .apply();
 
         Intent intent = new Intent(requireActivity(), LoginActivity.class);

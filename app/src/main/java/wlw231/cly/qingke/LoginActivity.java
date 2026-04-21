@@ -37,31 +37,58 @@ public class LoginActivity extends AppCompatActivity {
 
     private static final int REQUEST_NOTIFICATION_PERMISSION = 1001;
 
+    // SharedPreferences 键名
+    private static final String PREF_NAME = "login_prefs";
+    private static final String KEY_SAVED_EMAIL = "saved_email";
+    private static final String KEY_SAVED_PASSWORD_HASH = "saved_password_hash";
+
     // UI 组件
     private TextInputEditText etUsername;
     private TextInputEditText etPassword;
     private MaterialCheckBox cbRemember;
     private MaterialButton btnLogin;
 
-    // 线程池与主线程 Handler
+    // 线程池与主线程 Handler（仅用于手动登录的网络请求）
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.login);   // 布局文件名为 login.xml
+        setContentView(R.layout.login);
 
-        // 首次启动时请求通知权限（Android 13+）
         requestNotificationPermissionIfNeeded();
-
         initViews();
+
+        // 检查本地凭证：如果已保存邮箱和密码哈希，直接进入主页（无需网络验证）
+        if (tryAutoLoginOffline()) {
+            return; // 自动登录成功，已跳转并关闭当前 Activity
+        }
+
+        // 未触发自动登录，则加载已保存的邮箱到输入框
         loadSavedEmail();
     }
 
     /**
-     * 在应用启动时请求通知权限（Android 13+ 必须）
+     * 离线自动登录：仅检查本地是否保存了邮箱和密码哈希。
+     * 若存在，直接视为已登录，跳转 MainActivity。
+     * @return true 表示已触发自动跳转，false 表示无有效凭证
      */
+    private boolean tryAutoLoginOffline() {
+        SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        String savedEmail = prefs.getString(KEY_SAVED_EMAIL, "");
+        String savedPasswordHash = prefs.getString(KEY_SAVED_PASSWORD_HASH, "");
+
+        if (!TextUtils.isEmpty(savedEmail) && !TextUtils.isEmpty(savedPasswordHash)) {
+            // 凭证完整，直接跳转主页
+            Toast.makeText(this, "自动登录成功", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+            return true;
+        }
+        return false;
+    }
+
     private void requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -94,45 +121,53 @@ public class LoginActivity extends AppCompatActivity {
         MaterialButton btnForgotPassword = findViewById(R.id.btnForgotPassword);
         MaterialButton btnSignup = findViewById(R.id.btnSignup);
 
-        btnLogin.setOnClickListener(v -> attemptLogin());
+        btnLogin.setOnClickListener(v -> {
+            String email = etUsername.getText().toString().trim();
+            String password = etPassword.getText().toString();
+            if (validateInput(email, password)) {
+                String passwordHash = sha256(password);
+                if (passwordHash != null) {
+                    performLogin(email, passwordHash, cbRemember.isChecked());
+                } else {
+                    Toast.makeText(this, "加密失败，请重试", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
         btnForgotPassword.setOnClickListener(v ->
                 startActivity(new Intent(LoginActivity.this, ForgetPSWActivity.class)));
         btnSignup.setOnClickListener(v ->
                 startActivity(new Intent(LoginActivity.this, RegisterActivity.class)));
     }
 
-    private void attemptLogin() {
-        String email = etUsername.getText().toString().trim();
-        String password = etPassword.getText().toString();
-
-        // 输入校验
+    private boolean validateInput(String email, String password) {
         if (TextUtils.isEmpty(email)) {
             etUsername.setError("邮箱不能为空");
-            return;
+            return false;
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             etUsername.setError("邮箱格式不正确");
-            return;
+            return false;
         }
         if (TextUtils.isEmpty(password)) {
             etPassword.setError("密码不能为空");
-            return;
+            return false;
         }
+        return true;
+    }
 
-        // SHA-256 加密
-        String passwordHash = sha256(password);
-        if (passwordHash == null) {
-            Toast.makeText(this, "加密失败，请重试", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // UI 防抖
+    /**
+     * 执行登录操作（需要网络验证）
+     * @param email 邮箱
+     * @param passwordHash 密码哈希
+     * @param remember 是否记住凭证
+     */
+    private void performLogin(String email, String passwordHash, boolean remember) {
         btnLogin.setEnabled(false);
         btnLogin.setText("登录中...");
 
         String dataToSend = PROTOCOL_PREFIX + email + "|" + passwordHash;
 
-        // 后台执行网络请求
         executor.execute(() -> {
             String response = sendDataViaSocket(dataToSend);
             mainHandler.post(() -> {
@@ -141,19 +176,32 @@ public class LoginActivity extends AppCompatActivity {
 
                 if ("LOGIN_SUCCESS".equals(response)) {
                     Toast.makeText(LoginActivity.this, "登录成功！", Toast.LENGTH_SHORT).show();
-                    if (cbRemember.isChecked()) {
-                        saveEmailToPrefs(email);
+
+                    // 保存登录状态
+                    SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+                    SharedPreferences.Editor editor = prefs.edit();
+                    editor.putString("user_id", email);
+                    if (remember) {
+                        editor.putString(KEY_SAVED_EMAIL, email);
+                        editor.putString(KEY_SAVED_PASSWORD_HASH, passwordHash);
+                    } else {
+                        // 如果不记住，清除之前可能保存的密码
+                        editor.remove(KEY_SAVED_PASSWORD_HASH);
                     }
-                    // 保存 user_id
-                    getSharedPreferences("login_prefs", MODE_PRIVATE)
-                            .edit()
-                            .putString("user_id", email)
-                            .apply();
+                    editor.apply();
+
                     // 跳转主界面
                     startActivity(new Intent(LoginActivity.this, MainActivity.class));
                     finish();
                 } else if ("LOGIN_FAILED".equals(response)) {
                     Toast.makeText(LoginActivity.this, "邮箱或密码错误", Toast.LENGTH_LONG).show();
+                    // 登录失败时，如果之前有保存的凭证，应清除密码（因为可能密码已修改）
+                    if (remember) {
+                        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                                .edit()
+                                .remove(KEY_SAVED_PASSWORD_HASH)
+                                .apply();
+                    }
                 } else {
                     Toast.makeText(LoginActivity.this, "连接服务器失败，请检查网络", Toast.LENGTH_LONG).show();
                 }
@@ -161,12 +209,9 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 通过 Socket 发送数据并接收响应
-     */
     private String sendDataViaSocket(String data) {
         try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
-            socket.setSoTimeout(5000);  // 5 秒超时
+            socket.setSoTimeout(5000);
             OutputStream out = socket.getOutputStream();
             out.write((data + "\n").getBytes("UTF-8"));
             out.flush();
@@ -184,9 +229,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * SHA-256 哈希计算
-     */
     private String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -202,16 +244,9 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void saveEmailToPrefs(String email) {
-        getSharedPreferences("login_prefs", MODE_PRIVATE)
-                .edit()
-                .putString("saved_email", email)
-                .apply();
-    }
-
     private void loadSavedEmail() {
-        SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
-        String savedEmail = prefs.getString("saved_email", "");
+        SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        String savedEmail = prefs.getString(KEY_SAVED_EMAIL, "");
         if (!TextUtils.isEmpty(savedEmail)) {
             etUsername.setText(savedEmail);
             cbRemember.setChecked(true);
