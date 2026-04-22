@@ -1,5 +1,6 @@
 package wlw231.cly.qingke.ui.plan;
 
+import android.graphics.Paint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +19,11 @@ import wlw231.cly.qingke.R;
 
 public class PlanAdapter extends RecyclerView.Adapter<PlanAdapter.ViewHolder> {
 
+    // 单击回调接口
+    public interface OnPlanClickListener {
+        void onPlanClick(PlanEntity plan);
+    }
+
     // 长按回调接口
     public interface OnPlanLongClickListener {
         void onPlanLongClick(PlanEntity plan);
@@ -25,7 +31,13 @@ public class PlanAdapter extends RecyclerView.Adapter<PlanAdapter.ViewHolder> {
 
     private List<PlanEntity> plans = new ArrayList<>();
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
+    private OnPlanClickListener clickListener;
     private OnPlanLongClickListener longClickListener;
+
+    public void setOnPlanClickListener(OnPlanClickListener listener) {
+        this.clickListener = listener;
+    }
 
     public void setOnPlanLongClickListener(OnPlanLongClickListener listener) {
         this.longClickListener = listener;
@@ -50,7 +62,23 @@ public class PlanAdapter extends RecyclerView.Adapter<PlanAdapter.ViewHolder> {
         holder.tvName.setText(plan.name);
         holder.tvTime.setText(timeFormat.format(new Date(plan.startTimeMillis)));
 
-        // 设置长按监听
+        // 根据完成状态设置删除线和颜色
+        if (plan.isCompleted) {
+            holder.tvName.setPaintFlags(holder.tvName.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            holder.tvName.setTextColor(0xFFB0B0B0); // 灰色
+        } else {
+            holder.tvName.setPaintFlags(holder.tvName.getPaintFlags() & (~Paint.STRIKE_THRU_TEXT_FLAG));
+            holder.tvName.setTextColor(0xFF2C3E50); // 正常深色
+        }
+
+        // 单击事件：切换完成状态
+        holder.itemView.setOnClickListener(v -> {
+            if (clickListener != null) {
+                clickListener.onPlanClick(plan);
+            }
+        });
+
+        // 长按事件：弹出操作菜单
         holder.itemView.setOnLongClickListener(v -> {
             if (longClickListener != null) {
                 longClickListener.onPlanLongClick(plan);

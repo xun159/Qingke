@@ -206,4 +206,12 @@ public class PlanDatabaseHelper extends SQLiteOpenHelper {
         plan.notified = cursor.getInt(cursor.getColumnIndexOrThrow(COL_NOTIFIED)) == 1;
         return plan;
     }
+    public void deleteAllCompletedPlans() {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            db.delete(TABLE_PLANS, COL_COMPLETED + " = 1", null);
+            db.close();
+            refreshTodayPlans(); // 刷新 LiveData，更新 UI
+        });
+    }
 }

@@ -41,6 +41,7 @@
             android:id="@+id/tvAssistantMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxWidth="260dp"
             android:padding="12dp"
             android:textColor="@android:color/white"
             android:textSize="15sp" />

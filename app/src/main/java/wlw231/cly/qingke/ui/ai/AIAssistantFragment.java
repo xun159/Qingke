@@ -1,6 +1,7 @@
 package wlw231.cly.qingke.ui.ai;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -15,8 +16,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -45,14 +47,11 @@ import wlw231.cly.qingke.R;
 public class AIAssistantFragment extends Fragment {
 
     private static final String TAG = "AIAssistantFragment";
-    private static final String SERVER_HOST = "192.168.12.124"; // 真机需替换为实际 IP
+    private static final String SERVER_HOST = "192.168.12.124";
     private static final int SERVER_PORT = 6000;
-    private static final int REQUEST_CODE_FILE = 100;
 
     private RecyclerView rvMessages;
     private EditText etMessage;
-    private MaterialButton btnSend;
-    private MaterialButton btnUploadFile;
     private ChatAdapter adapter;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -60,10 +59,19 @@ public class AIAssistantFragment extends Fragment {
 
     private String userId;
 
+    private final ActivityResultLauncher<String> filePickerLauncher =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) {
+                    String fileName = getFileName(uri);
+                    adapter.addMessage(new ChatAdapter.Message("📎 上传文件: " + fileName, true));
+                    uploadFile(uri, fileName);
+                }
+            });
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        userId = requireActivity().getSharedPreferences("login_prefs", requireActivity().MODE_PRIVATE)
+        userId = requireActivity().getSharedPreferences("login_prefs", Context.MODE_PRIVATE)
                 .getString("user_id", "user_123");
     }
 
@@ -83,19 +91,19 @@ public class AIAssistantFragment extends Fragment {
     private void initViews(View root) {
         rvMessages = root.findViewById(R.id.rvMessages);
         etMessage = root.findViewById(R.id.etMessage);
-        btnSend = root.findViewById(R.id.btnSend);
-        btnUploadFile = root.findViewById(R.id.btnUploadFile);
+        MaterialButton btnSend = root.findViewById(R.id.btnSend);
+        MaterialButton btnUploadFile = root.findViewById(R.id.btnUploadFile);
         MaterialButton btnClearChat = root.findViewById(R.id.btnClearChat);
 
         adapter = new ChatAdapter();
         rvMessages.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvMessages.setItemAnimator(null); // 禁用动画，减少闪烁
         rvMessages.setAdapter(adapter);
 
-        // 欢迎消息
         adapter.addMessage(new ChatAdapter.Message("你好！我是 AI 助手，有什么可以帮你的？", false));
 
         btnSend.setOnClickListener(v -> sendMessage());
-        btnUploadFile.setOnClickListener(v -> openFilePicker());
+        btnUploadFile.setOnClickListener(v -> filePickerLauncher.launch("*/*"));
         btnClearChat.setOnClickListener(v -> {
             adapter.clearMessages();
             adapter.addMessage(new ChatAdapter.Message("聊天已清空，有什么新问题？", false));
@@ -110,7 +118,6 @@ public class AIAssistantFragment extends Fragment {
         etMessage.setText("");
         scrollToBottom();
 
-        // 占位消息
         adapter.addMessage(new ChatAdapter.Message("...", false));
         int loadingPos = adapter.getItemCount() - 1;
 
@@ -130,7 +137,7 @@ public class AIAssistantFragment extends Fragment {
 
     private String sendChatViaSocket(String userId, String message) {
         try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
-            socket.setSoTimeout(0);  // 无限等待
+            socket.setSoTimeout(0);
 
             OutputStream out = socket.getOutputStream();
             byte[] msgBytes = message.getBytes(StandardCharsets.UTF_8);
@@ -139,23 +146,21 @@ public class AIAssistantFragment extends Fragment {
             out.write(msgBytes);
             out.flush();
 
-            // 读取响应头
             InputStream in = socket.getInputStream();
             String respHeader = readLine(in);
             Log.d(TAG, "响应头: " + respHeader);
 
             if (respHeader == null || respHeader.isEmpty()) {
-                Log.e(TAG, "响应头为空，可能服务端提前关闭连接");
+                Log.e(TAG, "响应头为空");
                 return null;
             }
 
-            if (respHeader.startsWith("ANSWER|")) {
+            if (respHeader.startsWith("CHUNK|")) {
+                return readStreamingResponse(in, respHeader);
+            } else if (respHeader.startsWith("ANSWER|")) {
                 int ansLen = Integer.parseInt(respHeader.split("\\|")[1]);
-                Log.d(TAG, "期望回答长度: " + ansLen);
                 byte[] ansBytes = readExact(in, ansLen);
-                String answer = new String(ansBytes, StandardCharsets.UTF_8);
-                Log.d(TAG, "实际回答长度: " + answer.length());
-                return answer;
+                return new String(ansBytes, StandardCharsets.UTF_8);
             } else {
                 Log.e(TAG, "未知响应头: " + respHeader);
                 return null;
@@ -169,14 +174,48 @@ public class AIAssistantFragment extends Fragment {
         }
     }
 
-    // 添加 readLine 和 readExact 方法（若之前未定义）
+    private String readStreamingResponse(InputStream in, String firstChunkHeader) throws IOException {
+        StringBuilder fullAnswer = new StringBuilder();
+        int loadingPos = adapter.getItemCount() - 1;
+
+        String header = firstChunkHeader;
+        while (true) {
+            if (header.startsWith("CHUNK|")) {
+                int len = Integer.parseInt(header.split("\\|")[1]);
+                byte[] data = readExact(in, len);
+                String chunk = new String(data, StandardCharsets.UTF_8);
+                fullAnswer.append(chunk);
+
+                mainHandler.post(() -> {
+                    if (loadingPos >= 0 && loadingPos < adapter.getItemCount()) {
+                        ChatAdapter.Message msg = adapter.messages.get(loadingPos);
+                        if (!msg.isUser) {
+                            msg.text = fullAnswer.toString();
+                            adapter.notifyItemChanged(loadingPos, "text_update");
+                        }
+                    }
+                    scrollToBottom();
+                });
+
+                header = readLine(in);
+            } else if ("CHUNK_END".equals(header)) {
+                Log.d(TAG, "流式传输结束");
+                break;
+            } else {
+                Log.w(TAG, "未知流式头部: " + header);
+                break;
+            }
+        }
+        return fullAnswer.toString();
+    }
+
     private String readLine(InputStream in) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         int ch;
         while ((ch = in.read()) != -1 && ch != '\n') {
             baos.write(ch);
         }
-        return baos.toString(StandardCharsets.UTF_8.name());
+        return baos.toString(StandardCharsets.UTF_8);
     }
 
     private byte[] readExact(InputStream in, int length) throws IOException {
@@ -188,44 +227,6 @@ public class AIAssistantFragment extends Fragment {
             offset += read;
         }
         return data;
-    }
-
-    private void openFilePicker() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(Intent.createChooser(intent, "选择文件"), REQUEST_CODE_FILE);
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_FILE && resultCode == Activity.RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            if (uri != null) {
-                String fileName = getFileName(uri);
-                adapter.addMessage(new ChatAdapter.Message("📎 上传文件: " + fileName, true));
-                uploadFile(uri, fileName);
-            }
-        }
-    }
-
-    private String getFileName(Uri uri) {
-        String result = "unknown";
-        if ("content".equals(uri.getScheme())) {
-            try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                    if (index != -1) result = cursor.getString(index);
-                }
-            }
-        }
-        if ("unknown".equals(result)) {
-            result = uri.getPath();
-            int cut = result.lastIndexOf('/');
-            if (cut != -1) result = result.substring(cut + 1);
-        }
-        return result;
     }
 
     private void uploadFile(Uri uri, String fileName) {
@@ -272,6 +273,26 @@ public class AIAssistantFragment extends Fragment {
         });
     }
 
+    private String getFileName(Uri uri) {
+        String result = "unknown";
+        if ("content".equals(uri.getScheme())) {
+            try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (index != -1) result = cursor.getString(index);
+                }
+            }
+        }
+        if ("unknown".equals(result)) {
+            String path = uri.getPath();
+            if (path != null) {
+                int cut = path.lastIndexOf('/');
+                if (cut != -1) result = path.substring(cut + 1);
+            }
+        }
+        return result;
+    }
+
     private void scrollToBottom() {
         rvMessages.post(() -> rvMessages.smoothScrollToPosition(adapter.getItemCount() - 1));
     }
@@ -287,7 +308,7 @@ public class AIAssistantFragment extends Fragment {
 
         public static class Message {
             public String text;
-            public boolean isUser;
+            public final boolean isUser;
 
             public Message(String text, boolean isUser) {
                 this.text = text;
@@ -295,7 +316,7 @@ public class AIAssistantFragment extends Fragment {
             }
         }
 
-        private final List<Message> messages = new ArrayList<>();
+        final List<Message> messages = new ArrayList<>();
 
         public void addMessage(Message msg) {
             messages.add(msg);
@@ -310,8 +331,9 @@ public class AIAssistantFragment extends Fragment {
         }
 
         public void clearMessages() {
+            int size = messages.size();
             messages.clear();
-            notifyDataSetChanged();
+            notifyItemRangeRemoved(0, size);
         }
 
         @Override
@@ -341,9 +363,23 @@ public class AIAssistantFragment extends Fragment {
             }
         }
 
-        private static class ViewHolder extends RecyclerView.ViewHolder {
-            MaterialCardView cardUser, cardAssistant;
-            TextView tvUserMessage, tvAssistantMessage;
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull List<Object> payloads) {
+            if (!payloads.isEmpty()) {
+                Message msg = messages.get(position);
+                if (!msg.isUser) {
+                    holder.tvAssistantMessage.setText(msg.text);
+                } else {
+                    holder.tvUserMessage.setText(msg.text);
+                }
+            } else {
+                onBindViewHolder(holder, position);
+            }
+        }
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            final MaterialCardView cardUser, cardAssistant;
+            final TextView tvUserMessage, tvAssistantMessage;
 
             ViewHolder(View itemView) {
                 super(itemView);

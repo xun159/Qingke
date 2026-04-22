@@ -2,6 +2,7 @@ package wlw231.cly.qingke;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.icu.util.Calendar;
 import android.os.Build;          // 必须导入
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -10,8 +11,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+import java.util.concurrent.TimeUnit;
+
+import wlw231.cly.qingke.ui.plan.MidnightCleanupWorker;
 import wlw231.cly.qingke.ui.plan.PlanReminderService;
 import wlw231.cly.qingke.utils.CourseReminderHelper;
 
@@ -66,11 +74,35 @@ public class MainActivity extends AppCompatActivity {
         } else {
             startService(serviceIntent);
         }
+        scheduleMidnightCleanup();
     }
 
     private boolean isLoggedIn() {
         SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
         String userId = prefs.getString("user_id", "");
         return !TextUtils.isEmpty(userId);
+    }
+    // 例如在 MainActivity.onCreate() 末尾
+    private void scheduleMidnightCleanup() {
+        Calendar midnight = Calendar.getInstance();
+        midnight.set(Calendar.HOUR_OF_DAY, 0);
+        midnight.set(Calendar.MINUTE, 0);
+        midnight.set(Calendar.SECOND, 0);
+        midnight.set(Calendar.MILLISECOND, 0);
+        midnight.add(Calendar.DAY_OF_YEAR, 1); // 明天 00:00
+
+        long initialDelay = midnight.getTimeInMillis() - System.currentTimeMillis();
+
+        PeriodicWorkRequest cleanupRequest = new PeriodicWorkRequest.Builder(
+                MidnightCleanupWorker.class,
+                24, TimeUnit.HOURS)
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "midnight_cleanup",
+                ExistingPeriodicWorkPolicy.KEEP,
+                cleanupRequest
+        );
     }
 }

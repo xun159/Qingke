@@ -1,5 +1,6 @@
 package wlw231.cly.qingke.ui.plan;
 
+import android.graphics.Paint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,13 +22,22 @@ public class FuturePlansAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private static final int TYPE_HEADER = 0;
     private static final int TYPE_PLAN = 1;
 
+    public interface OnPlanClickListener {
+        void onPlanClick(PlanEntity plan);
+    }
+
     public interface OnPlanLongClickListener {
         void onPlanLongClick(PlanEntity plan);
     }
 
     private List<Object> items = new ArrayList<>();
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    private OnPlanClickListener clickListener;
     private OnPlanLongClickListener longClickListener;
+
+    public void setOnPlanClickListener(OnPlanClickListener listener) {
+        this.clickListener = listener;
+    }
 
     public void setOnPlanLongClickListener(OnPlanLongClickListener listener) {
         this.longClickListener = listener;
@@ -67,11 +77,24 @@ public class FuturePlansAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             vh.tvName.setText(plan.name);
             vh.tvTime.setText(timeFormat.format(new Date(plan.startTimeMillis)));
 
+            // 删除线效果
+            if (plan.isCompleted) {
+                vh.tvName.setPaintFlags(vh.tvName.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+                vh.tvName.setTextColor(0xFFB0B0B0);
+            } else {
+                vh.tvName.setPaintFlags(vh.tvName.getPaintFlags() & (~Paint.STRIKE_THRU_TEXT_FLAG));
+                vh.tvName.setTextColor(0xFF2C3E50);
+            }
+
+            vh.itemView.setOnClickListener(v -> {
+                if (clickListener != null) clickListener.onPlanClick(plan);
+            });
             vh.itemView.setOnLongClickListener(v -> {
                 if (longClickListener != null) {
                     longClickListener.onPlanLongClick(plan);
+                    return true;
                 }
-                return true;
+                return false;
             });
         }
     }

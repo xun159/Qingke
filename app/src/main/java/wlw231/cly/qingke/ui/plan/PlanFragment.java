@@ -75,12 +75,19 @@ public class PlanFragment extends Fragment {
         adapterQ3 = new PlanAdapter();
         adapterQ4 = new PlanAdapter();
 
-        // 设置长按监听
+        // 设置单击监听（切换完成状态）
+        PlanAdapter.OnPlanClickListener clickListener = plan -> {
+            plan.isCompleted = !plan.isCompleted;
+            dbHelper.updatePlan(plan, null);
+        };
+
+        // 设置长按监听（弹出操作菜单）
         PlanAdapter.OnPlanLongClickListener longClickListener = this::showPlanOptionsMenu;
-        adapterQ1.setOnPlanLongClickListener(longClickListener);
-        adapterQ2.setOnPlanLongClickListener(longClickListener);
-        adapterQ3.setOnPlanLongClickListener(longClickListener);
-        adapterQ4.setOnPlanLongClickListener(longClickListener);
+
+        for (PlanAdapter adapter : new PlanAdapter[]{adapterQ1, adapterQ2, adapterQ3, adapterQ4}) {
+            adapter.setOnPlanClickListener(clickListener);
+            adapter.setOnPlanLongClickListener(longClickListener);
+        }
 
         LinearLayoutManager layoutManager1 = new LinearLayoutManager(requireContext());
         LinearLayoutManager layoutManager2 = new LinearLayoutManager(requireContext());
@@ -215,7 +222,7 @@ public class PlanFragment extends Fragment {
             spinnerQuadrant.setSelection(defaultQuadrant - 1);
             selectedStartCalendar = Calendar.getInstance();
             selectedEndCalendar = Calendar.getInstance();
-            selectedEndCalendar.add(Calendar.HOUR_OF_DAY, 1); // 默认结束时间为1小时后
+            selectedEndCalendar.add(Calendar.HOUR_OF_DAY, 1);
         }
 
         updateDateTimeTexts(tvStartDate, tvStartTime, selectedStartCalendar);
@@ -265,8 +272,6 @@ public class PlanFragment extends Fragment {
             }
 
             dialog.dismiss();
-
-            // 重置选择器
             selectedStartCalendar = Calendar.getInstance();
             selectedEndCalendar = Calendar.getInstance();
         });

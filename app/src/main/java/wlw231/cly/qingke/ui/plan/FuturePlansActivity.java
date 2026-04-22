@@ -48,8 +48,8 @@ public class FuturePlansActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         toolbar.setTitleTextColor(getResources().getColor(R.color.primary));
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(false);  // 显式禁用返回箭头
-            getSupportActionBar().setTitle("未来计划");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+            getSupportActionBar().setTitle("全部计划");
         }
 
         dbHelper = PlanDatabaseHelper.getInstance(this);
@@ -57,7 +57,10 @@ public class FuturePlansActivity extends AppCompatActivity {
         rvFuturePlans = findViewById(R.id.rvFuturePlans);
         rvFuturePlans.setLayoutManager(new LinearLayoutManager(this));
         adapter = new FuturePlansAdapter();
+
+        adapter.setOnPlanClickListener(this::onPlanClicked);
         adapter.setOnPlanLongClickListener(this::showPlanOptionsMenu);
+
         rvFuturePlans.setAdapter(adapter);
 
         loadFuturePlans();
@@ -66,26 +69,17 @@ public class FuturePlansActivity extends AppCompatActivity {
     private void loadFuturePlans() {
         List<PlanEntity> allPlans = dbHelper.getAllPlansSync();
 
-        Calendar todayStart = Calendar.getInstance();
-        todayStart.set(Calendar.HOUR_OF_DAY, 0);
-        todayStart.set(Calendar.MINUTE, 0);
-        todayStart.set(Calendar.SECOND, 0);
-        todayStart.set(Calendar.MILLISECOND, 0);
-        long minStart = todayStart.getTimeInMillis();
+        // 直接使用所有计划，不做过多的过滤（午夜清理会处理已完成计划）
+        List<PlanEntity> plansToShow = new ArrayList<>(allPlans);
 
-        List<PlanEntity> futurePlans = new ArrayList<>();
-        for (PlanEntity plan : allPlans) {
-            if (plan.startTimeMillis >= minStart && !plan.isCompleted) {
-                futurePlans.add(plan);
-            }
-        }
+        // 按开始时间升序排列
+        Collections.sort(plansToShow, (p1, p2) -> Long.compare(p1.startTimeMillis, p2.startTimeMillis));
 
-        Collections.sort(futurePlans, (p1, p2) -> Long.compare(p1.startTimeMillis, p2.startTimeMillis));
-
+        // 按日期分组
         List<Object> items = new ArrayList<>();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String currentDate = "";
-        for (PlanEntity plan : futurePlans) {
+        for (PlanEntity plan : plansToShow) {
             String dateKey = dateFormat.format(new Date(plan.startTimeMillis));
             if (!dateKey.equals(currentDate)) {
                 currentDate = dateKey;
@@ -97,7 +91,11 @@ public class FuturePlansActivity extends AppCompatActivity {
         adapter.submitList(items);
     }
 
-    // ---------- 长按菜单（与 PlanFragment 逻辑一致）----------
+    private void onPlanClicked(PlanEntity plan) {
+        plan.isCompleted = !plan.isCompleted;
+        dbHelper.updatePlan(plan, () -> runOnUiThread(this::loadFuturePlans));
+    }
+
     private void showPlanOptionsMenu(PlanEntity plan) {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(plan.name)
@@ -137,12 +135,10 @@ public class FuturePlansActivity extends AppCompatActivity {
                 .setTitle("删除计划")
                 .setMessage("确定要删除「" + plan.name + "」吗？")
                 .setPositiveButton("删除", (dialog, which) -> {
-                    dbHelper.deletePlan(plan.id, () -> {
-                        runOnUiThread(() -> {
-                            Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
-                            loadFuturePlans();
-                        });
-                    });
+                    dbHelper.deletePlan(plan.id, () -> runOnUiThread(() -> {
+                        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+                        loadFuturePlans();
+                    }));
                 })
                 .setNegativeButton("取消", null)
                 .show();
@@ -157,7 +153,6 @@ public class FuturePlansActivity extends AppCompatActivity {
         }
     }
 
-    // ---------- 编辑对话框（复用添加布局）----------
     private void showAddEditDialog(PlanEntity editPlan, int defaultQuadrant) {
         boolean isEdit = editPlan != null;
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
@@ -216,12 +211,10 @@ public class FuturePlansActivity extends AppCompatActivity {
                 editPlan.quadrant = quadrant;
                 editPlan.startTimeMillis = selectedStartCalendar.getTimeInMillis();
                 editPlan.endTimeMillis = selectedEndCalendar.getTimeInMillis();
-                dbHelper.updatePlan(editPlan, () -> {
-                    runOnUiThread(() -> {
-                        Toast.makeText(this, "计划已更新", Toast.LENGTH_SHORT).show();
-                        loadFuturePlans();
-                    });
-                });
+                dbHelper.updatePlan(editPlan, () -> runOnUiThread(() -> {
+                    Toast.makeText(this, "计划已更新", Toast.LENGTH_SHORT).show();
+                    loadFuturePlans();
+                }));
             } else {
                 PlanEntity plan = new PlanEntity();
                 plan.name = name;
@@ -230,12 +223,10 @@ public class FuturePlansActivity extends AppCompatActivity {
                 plan.endTimeMillis = selectedEndCalendar.getTimeInMillis();
                 plan.isCompleted = false;
                 plan.notified = false;
-                dbHelper.insertPlan(plan, () -> {
-                    runOnUiThread(() -> {
-                        Toast.makeText(this, "计划已添加", Toast.LENGTH_SHORT).show();
-                        loadFuturePlans();
-                    });
-                });
+                dbHelper.insertPlan(plan, () -> runOnUiThread(() -> {
+                    Toast.makeText(this, "计划已添加", Toast.LENGTH_SHORT).show();
+                    loadFuturePlans();
+                }));
             }
 
             dialog.dismiss();
