@@ -36,7 +36,7 @@ import wlw231.cly.qingke.R;
 
 public class ProfileFragment extends Fragment {
 
-    private static final String SERVER_HOST = "192.168.12.124"; // 与登录注册保持一致
+    private static final String SERVER_HOST = "192.168.5.124"; // 与登录注册保持一致
     private static final int SERVER_PORT = 5050;
 
     private ImageView ivAvatar;

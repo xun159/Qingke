@@ -8,6 +8,9 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import wlw231.cly.qingke.model.Course;   // ← 必须导入
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class CourseDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "courses.db";
@@ -146,5 +149,41 @@ public class CourseDatabaseHelper extends SQLiteOpenHelper {
     public Cursor queryAllCourses() {
         SQLiteDatabase db = getReadableDatabase();
         return db.query(TABLE_COURSES, null, null, null, null, null, null);
+    }
+
+    /**
+     * 查询指定星期和周次范围内的课程列表
+     * @param weekdays 星期列表（1=周一...7=周日）
+     * @param week 当前周次（用于判断课程是否在有效周次范围内）
+     * @return 课程列表
+     */
+    public List<Course> queryCoursesByWeekdaysAndWeek(List<Integer> weekdays, int week) {
+        List<Course> list = new ArrayList<>();
+        if (weekdays == null || weekdays.isEmpty()) return list;
+
+        SQLiteDatabase db = getReadableDatabase();
+        StringBuilder placeholders = new StringBuilder();
+        String[] args = new String[weekdays.size() + 2];
+        for (int i = 0; i < weekdays.size(); i++) {
+            if (i > 0) placeholders.append(",");
+            placeholders.append("?");
+            args[i] = String.valueOf(weekdays.get(i));
+        }
+        args[weekdays.size()] = String.valueOf(week);
+        args[weekdays.size() + 1] = String.valueOf(week);
+
+        String selection = COLUMN_WEEKDAY + " IN (" + placeholders + ") AND "
+                + COLUMN_START_WEEK + " <= ? AND " + COLUMN_END_WEEK + " >= ?";
+
+        Cursor cursor = db.query(TABLE_COURSES, null, selection, args,
+                null, null, COLUMN_WEEKDAY + " ASC, " + COLUMN_SECTION + " ASC");
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                list.add(cursorToCourse(cursor));
+            }
+            cursor.close();
+        }
+        db.close();
+        return list;
     }
 }

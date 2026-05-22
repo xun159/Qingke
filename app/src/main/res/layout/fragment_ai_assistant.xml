@@ -5,6 +5,17 @@
     android:layout_height="match_parent"
     android:padding="12dp">
 
+    <!-- 计划建议按钮 - 新增 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPlanSuggest"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="计划建议"
+        android:textSize="12sp"
+        app:cornerRadius="20dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- 清空聊天按钮 -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnClearChat"
@@ -29,7 +40,7 @@
         app:layout_constraintBottom_toTopOf="@+id/layoutInput"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btnClearChat" />
+        app:layout_constraintTop_toBottomOf="@+id/btnPlanSuggest" />
 
     <!-- 底部输入栏容器 -->
     <androidx.constraintlayout.widget.ConstraintLayout

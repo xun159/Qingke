@@ -37,17 +37,33 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import wlw231.cly.qingke.R;
+import wlw231.cly.qingke.data.CourseDatabaseHelper;
+import wlw231.cly.qingke.model.Course;
+import wlw231.cly.qingke.ui.plan.PlanDatabaseHelper;
+import wlw231.cly.qingke.ui.plan.PlanEntity;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
+import android.app.DatePickerDialog;
+import android.widget.LinearLayout;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 
 public class AIAssistantFragment extends Fragment {
 
     private static final String TAG = "AIAssistantFragment";
-    private static final String SERVER_HOST = "192.168.12.124";
+    private static final String SERVER_HOST = "192.168.5.124";
     private static final int SERVER_PORT = 6000;
 
     private RecyclerView rvMessages;
@@ -94,6 +110,7 @@ public class AIAssistantFragment extends Fragment {
         MaterialButton btnSend = root.findViewById(R.id.btnSend);
         MaterialButton btnUploadFile = root.findViewById(R.id.btnUploadFile);
         MaterialButton btnClearChat = root.findViewById(R.id.btnClearChat);
+        MaterialButton btnPlanSuggest = root.findViewById(R.id.btnPlanSuggest);
 
         adapter = new ChatAdapter();
         rvMessages.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -108,6 +125,7 @@ public class AIAssistantFragment extends Fragment {
             adapter.clearMessages();
             adapter.addMessage(new ChatAdapter.Message("聊天已清空，有什么新问题？", false));
         });
+        btnPlanSuggest.setOnClickListener(v -> showPlanSuggestDialog());
     }
 
     private void sendMessage() {
@@ -291,6 +309,330 @@ public class AIAssistantFragment extends Fragment {
             }
         }
         return result;
+    }
+
+    // ---------- 计划建议功能 ----------
+
+    private Calendar planStartCal = Calendar.getInstance();
+    private Calendar planEndCal = Calendar.getInstance();
+    private Calendar courseStartCal = Calendar.getInstance();
+    private Calendar courseEndCal = Calendar.getInstance();
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+    private void showPlanSuggestDialog() {
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_plan_suggest, null);
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
+                .setView(dialogView)
+                .create();
+
+        // 初始化默认日期为今天
+        resetToToday(planStartCal, planEndCal);
+        resetToToday(courseStartCal, courseEndCal);
+
+        RadioGroup rgPlanRange = dialogView.findViewById(R.id.rgPlanRange);
+        RadioGroup rgCourseRange = dialogView.findViewById(R.id.rgCourseRange);
+        LinearLayout layoutPlanCustom = dialogView.findViewById(R.id.layoutPlanCustom);
+        LinearLayout layoutCourseCustom = dialogView.findViewById(R.id.layoutCourseCustom);
+        TextView tvPlanStartDate = dialogView.findViewById(R.id.tvPlanStartDate);
+        TextView tvPlanEndDate = dialogView.findViewById(R.id.tvPlanEndDate);
+        TextView tvCourseStartDate = dialogView.findViewById(R.id.tvCourseStartDate);
+        TextView tvCourseEndDate = dialogView.findViewById(R.id.tvCourseEndDate);
+        TextView tvPlanCount = dialogView.findViewById(R.id.tvPlanCount);
+        TextView tvCourseCount = dialogView.findViewById(R.id.tvCourseCount);
+
+        // 计划范围快捷选项监听
+        rgPlanRange.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbPlanToday) {
+                layoutPlanCustom.setVisibility(View.GONE);
+                resetToToday(planStartCal, planEndCal);
+            } else if (checkedId == R.id.rbPlanThisWeek) {
+                layoutPlanCustom.setVisibility(View.GONE);
+                setToThisWeek(planStartCal, planEndCal);
+            } else if (checkedId == R.id.rbPlanNextWeek) {
+                layoutPlanCustom.setVisibility(View.GONE);
+                setToNextWeek(planStartCal, planEndCal);
+            } else if (checkedId == R.id.rbPlanCustom) {
+                layoutPlanCustom.setVisibility(View.VISIBLE);
+                tvPlanStartDate.setText(dateFormat.format(planStartCal.getTime()));
+                tvPlanEndDate.setText(dateFormat.format(planEndCal.getTime()));
+            }
+            updateDataSummary(tvPlanCount, tvCourseCount);
+        });
+
+        // 课程范围快捷选项监听
+        rgCourseRange.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbCourseToday) {
+                layoutCourseCustom.setVisibility(View.GONE);
+                resetToToday(courseStartCal, courseEndCal);
+            } else if (checkedId == R.id.rbCourseThisWeek) {
+                layoutCourseCustom.setVisibility(View.GONE);
+                setToThisWeek(courseStartCal, courseEndCal);
+            } else if (checkedId == R.id.rbCourseNextWeek) {
+                layoutCourseCustom.setVisibility(View.GONE);
+                setToNextWeek(courseStartCal, courseEndCal);
+            } else if (checkedId == R.id.rbCourseCustom) {
+                layoutCourseCustom.setVisibility(View.VISIBLE);
+                tvCourseStartDate.setText(dateFormat.format(courseStartCal.getTime()));
+                tvCourseEndDate.setText(dateFormat.format(courseEndCal.getTime()));
+            }
+            updateDataSummary(tvPlanCount, tvCourseCount);
+        });
+
+        // 自定义日期选择器点击事件
+        tvPlanStartDate.setOnClickListener(v -> showDatePickerFor(planStartCal, tvPlanStartDate, () ->
+                updateDataSummary(tvPlanCount, tvCourseCount)));
+        tvPlanEndDate.setOnClickListener(v -> showDatePickerFor(planEndCal, tvPlanEndDate, () ->
+                updateDataSummary(tvPlanCount, tvCourseCount)));
+        tvCourseStartDate.setOnClickListener(v -> showDatePickerFor(courseStartCal, tvCourseStartDate, () ->
+                updateDataSummary(tvPlanCount, tvCourseCount)));
+        tvCourseEndDate.setOnClickListener(v -> showDatePickerFor(courseEndCal, tvCourseEndDate, () ->
+                updateDataSummary(tvPlanCount, tvCourseCount)));
+
+        // 初始加载数据摘要
+        updateDataSummary(tvPlanCount, tvCourseCount);
+
+        // 按钮事件
+        dialogView.findViewById(R.id.btnCancel).setOnClickListener(v -> dialog.dismiss());
+        dialogView.findViewById(R.id.btnSend).setOnClickListener(v -> {
+            dialog.dismiss();
+            executePlanSuggest();
+        });
+
+        dialog.show();
+    }
+
+    private void resetToToday(Calendar start, Calendar end) {
+        start.setTimeInMillis(System.currentTimeMillis());
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+
+        end.setTimeInMillis(start.getTimeInMillis());
+        end.set(Calendar.HOUR_OF_DAY, 23);
+        end.set(Calendar.MINUTE, 59);
+        end.set(Calendar.SECOND, 59);
+        end.set(Calendar.MILLISECOND, 999);
+    }
+
+    private void setToThisWeek(Calendar start, Calendar end) {
+        start.setTimeInMillis(System.currentTimeMillis());
+        start.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+
+        end.setTimeInMillis(start.getTimeInMillis());
+        end.add(Calendar.DAY_OF_WEEK, 6);
+        end.set(Calendar.HOUR_OF_DAY, 23);
+        end.set(Calendar.MINUTE, 59);
+        end.set(Calendar.SECOND, 59);
+        end.set(Calendar.MILLISECOND, 999);
+    }
+
+    private void setToNextWeek(Calendar start, Calendar end) {
+        setToThisWeek(start, end);
+        start.add(Calendar.WEEK_OF_YEAR, 1);
+        end.add(Calendar.WEEK_OF_YEAR, 1);
+    }
+
+    private void showDatePickerFor(Calendar cal, TextView tv, Runnable onDateSet) {
+        new DatePickerDialog(requireContext(),
+                (view, year, month, day) -> {
+                    cal.set(Calendar.YEAR, year);
+                    cal.set(Calendar.MONTH, month);
+                    cal.set(Calendar.DAY_OF_MONTH, day);
+                    tv.setText(dateFormat.format(cal.getTime()));
+                    if (onDateSet != null) onDateSet.run();
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void updateDataSummary(TextView tvPlanCount, TextView tvCourseCount) {
+        PlanDatabaseHelper planDb = PlanDatabaseHelper.getInstance(requireContext());
+        List<PlanEntity> plans = planDb.queryPlansByTimeRangeSync(
+                planStartCal.getTimeInMillis(), planEndCal.getTimeInMillis());
+        tvPlanCount.setText("计划：" + plans.size() + " 条");
+
+        CourseDatabaseHelper courseDb = new CourseDatabaseHelper(requireContext());
+        List<Integer> weekdays = getWeekdaysInRange(courseStartCal, courseEndCal);
+        int currentWeek = getCurrentWeek();
+        List<Course> courses = courseDb.queryCoursesByWeekdaysAndWeek(weekdays, currentWeek);
+        tvCourseCount.setText("课程：" + courses.size() + " 节");
+    }
+
+    private void executePlanSuggest() {
+        adapter.addMessage(new ChatAdapter.Message("📋 正在获取计划建议...", true));
+        scrollToBottom();
+
+        adapter.addMessage(new ChatAdapter.Message("...", false));
+        int loadingPos = adapter.getItemCount() - 1;
+
+        executor.execute(() -> {
+            // 查询数据
+            PlanDatabaseHelper planDb = PlanDatabaseHelper.getInstance(requireContext());
+            List<PlanEntity> plans = planDb.queryPlansByTimeRangeSync(
+                    planStartCal.getTimeInMillis(), planEndCal.getTimeInMillis());
+
+            CourseDatabaseHelper courseDb = new CourseDatabaseHelper(requireContext());
+            List<Integer> weekdays = getWeekdaysInRange(courseStartCal, courseEndCal);
+            int currentWeek = getCurrentWeek();
+            List<Course> courses = courseDb.queryCoursesByWeekdaysAndWeek(weekdays, currentWeek);
+
+            // 构建 JSON
+            String json = buildPlanSuggestJson(plans, courses);
+
+            // 发送请求
+            String response = sendPlanSuggestViaSocket(userId, json);
+
+            mainHandler.post(() -> {
+                adapter.removeMessageAt(loadingPos);
+                if (response != null && !response.isEmpty()) {
+                    adapter.addMessage(new ChatAdapter.Message(response, false));
+                } else {
+                    adapter.addMessage(new ChatAdapter.Message("网络错误，请稍后重试", false));
+                }
+                scrollToBottom();
+            });
+        });
+    }
+
+    private String buildPlanSuggestJson(List<PlanEntity> plans, List<Course> courses) {
+        SimpleDateFormat dtFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+
+        JsonObject root = new JsonObject();
+        root.addProperty("userId", userId);
+
+        // 计划时间范围
+        JsonObject planRange = new JsonObject();
+        planRange.addProperty("start", dateFormat.format(planStartCal.getTime()));
+        planRange.addProperty("end", dateFormat.format(planEndCal.getTime()));
+        root.add("planRange", planRange);
+
+        // 课程时间范围
+        JsonObject courseRange = new JsonObject();
+        courseRange.addProperty("start", dateFormat.format(courseStartCal.getTime()));
+        courseRange.addProperty("end", dateFormat.format(courseEndCal.getTime()));
+        root.add("courseRange", courseRange);
+
+        // 计划数组
+        JsonArray plansArray = new JsonArray();
+        for (PlanEntity plan : plans) {
+            JsonObject p = new JsonObject();
+            p.addProperty("id", plan.id);
+            p.addProperty("name", plan.name);
+            p.addProperty("quadrant", plan.quadrant);
+            p.addProperty("quadrantName", getQuadrantName(plan.quadrant));
+            p.addProperty("startTime", dtFormat.format(new java.util.Date(plan.startTimeMillis)));
+            p.addProperty("endTime", dtFormat.format(new java.util.Date(plan.endTimeMillis)));
+            p.addProperty("completed", plan.isCompleted);
+            plansArray.add(p);
+        }
+        root.add("plans", plansArray);
+
+        // 课程数组
+        JsonArray coursesArray = new JsonArray();
+        String[] weekdayNames = {"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+        for (Course course : courses) {
+            JsonObject c = new JsonObject();
+            c.addProperty("id", course.getId());
+            c.addProperty("name", course.getName());
+            c.addProperty("weekday", course.getWeekday());
+            c.addProperty("weekdayName", weekdayNames[course.getWeekday()]);
+            c.addProperty("section", course.getSection());
+            c.addProperty("sectionDisplay", course.getSectionDisplay());
+            c.addProperty("classroom", course.getClassroom() != null ? course.getClassroom() : "");
+            c.addProperty("teacher", course.getTeacher() != null ? course.getTeacher() : "");
+            c.addProperty("startWeek", course.getStartWeek());
+            c.addProperty("endWeek", course.getEndWeek());
+            c.addProperty("startTime", course.getStartTime() != null ? course.getStartTime() : "");
+            c.addProperty("endTime", course.getEndTime() != null ? course.getEndTime() : "");
+            coursesArray.add(c);
+        }
+        root.add("courses", coursesArray);
+
+        return root.toString();
+    }
+
+    private String sendPlanSuggestViaSocket(String userId, String json) {
+        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT)) {
+            socket.setSoTimeout(0);
+
+            OutputStream out = socket.getOutputStream();
+            byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+            String header = "PLAN_SUGGEST|" + userId + "|" + jsonBytes.length + "\n";
+            out.write(header.getBytes(StandardCharsets.UTF_8));
+            out.write(jsonBytes);
+            out.flush();
+
+            InputStream in = socket.getInputStream();
+            String respHeader = readLine(in);
+            Log.d(TAG, "计划建议响应头: " + respHeader);
+
+            if (respHeader == null || respHeader.isEmpty()) {
+                Log.e(TAG, "响应头为空");
+                return null;
+            }
+
+            if (respHeader.startsWith("CHUNK|")) {
+                return readStreamingResponse(in, respHeader);
+            } else if (respHeader.startsWith("ANSWER|")) {
+                int ansLen = Integer.parseInt(respHeader.split("\\|")[1]);
+                byte[] ansBytes = readExact(in, ansLen);
+                return new String(ansBytes, StandardCharsets.UTF_8);
+            } else {
+                Log.e(TAG, "未知响应头: " + respHeader);
+                return null;
+            }
+        } catch (SocketTimeoutException e) {
+            Log.e(TAG, "Socket 超时", e);
+            return "服务响应超时，请稍后重试";
+        } catch (IOException e) {
+            Log.e(TAG, "IO 异常", e);
+            return null;
+        }
+    }
+
+    private String getQuadrantName(int quadrant) {
+        switch (quadrant) {
+            case 1: return "重要且紧急";
+            case 2: return "重要不紧急";
+            case 3: return "紧急不重要";
+            default: return "不重要不紧急";
+        }
+    }
+
+    /**
+     * 获取日期范围内包含的所有星期几（1=周一...7=周日）
+     */
+    private List<Integer> getWeekdaysInRange(Calendar start, Calendar end) {
+        List<Integer> weekdays = new ArrayList<>();
+        Calendar temp = (Calendar) start.clone();
+        while (!temp.after(end)) {
+            int dayOfWeek = temp.get(Calendar.DAY_OF_WEEK);
+            // Calendar.SUNDAY=1, MONDAY=2...SATURDAY=7 → 转换为 1=周一...7=周日
+            int converted = (dayOfWeek == Calendar.SUNDAY) ? 7 : dayOfWeek - 1;
+            if (!weekdays.contains(converted)) {
+                weekdays.add(converted);
+            }
+            temp.add(Calendar.DAY_OF_MONTH, 1);
+            // 避免无限循环，如果天数超过7，所有星期几都已覆盖
+            if (weekdays.size() >= 7) break;
+        }
+        return weekdays;
+    }
+
+    /**
+     * 获取当前周次（简单实现：以学期第1周的周一日期为基准计算）
+     * 此处默认返回1，实际项目中应从SharedPreferences或设置中读取
+     */
+    private int getCurrentWeek() {
+        // TODO: 从设置中读取学期开始日期并计算当前周次
+        // 暂时返回1作为默认值
+        return 1;
     }
 
     private void scrollToBottom() {
