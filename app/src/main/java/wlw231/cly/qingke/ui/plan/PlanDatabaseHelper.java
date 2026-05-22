@@ -206,6 +206,23 @@ public class PlanDatabaseHelper extends SQLiteOpenHelper {
         plan.notified = cursor.getInt(cursor.getColumnIndexOrThrow(COL_NOTIFIED)) == 1;
         return plan;
     }
+    public List<PlanEntity> queryPlansByTimeRangeSync(long startMillis, long endMillis) {
+        List<PlanEntity> list = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(TABLE_PLANS, null,
+                COL_START_TIME + " <= ? AND " + COL_END_TIME + " >= ?",
+                new String[]{String.valueOf(endMillis), String.valueOf(startMillis)},
+                null, null, COL_START_TIME + " ASC");
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                list.add(cursorToPlan(cursor));
+            }
+            cursor.close();
+        }
+        db.close();
+        return list;
+    }
+
     public void deleteAllCompletedPlans() {
         executor.execute(() -> {
             SQLiteDatabase db = getWritableDatabase();
