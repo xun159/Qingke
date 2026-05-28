@@ -53,4 +53,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.work:work-runtime:2.9.0")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }

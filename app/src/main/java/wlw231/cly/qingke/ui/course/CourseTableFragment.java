@@ -7,7 +7,10 @@ import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -31,30 +34,29 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import wlw231.cly.qingke.R;
 import wlw231.cly.qingke.data.CourseDatabaseHelper;
 import wlw231.cly.qingke.model.Course;
+import wlw231.cly.qingke.utils.CourseImportHelper;
 import wlw231.cly.qingke.utils.CourseOcrHelper;
 import wlw231.cly.qingke.utils.CourseReminderHelper;
 
 public class CourseTableFragment extends Fragment {
 
+    private static final String TAG = "CourseTableFragment";
     private static final int TOTAL_WEEKDAYS = 7;
-    private static final int TOTAL_SECTIONS = 5;      // 5大节
+    private static final int TOTAL_SECTIONS = 5;
     private static final int REQUEST_CODE_PICK_IMAGE = 1001;
+    private static final int REQUEST_CODE_IMPORT_FILE = 1002;
 
-    // 预设颜色池（8种柔和色）
     private static final String[] COLOR_PALETTE = {
-            "#FFAB91", // 淡珊瑚
-            "#80CBC4", // 浅碧绿
-            "#FFF59D", // 淡黄
-            "#CE93D8", // 浅紫
-            "#90CAF9", // 淡蓝
-            "#A5D6A7", // 浅绿
-            "#F48FB1", // 浅粉
-            "#FFCC80"  // 淡橙
+            "#FFAB91", "#80CBC4", "#FFF59D", "#CE93D8",
+            "#90CAF9", "#A5D6A7", "#F48FB1", "#FFCC80"
     };
 
     private ConstraintLayout headerRow;
@@ -64,6 +66,9 @@ public class CourseTableFragment extends Fragment {
 
     private int currentWeek = 1;
     private final Map<String, MaterialCardView> cellMap = new HashMap<>();
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
     @Override
@@ -252,9 +257,6 @@ public class CourseTableFragment extends Fragment {
         card.setTag(course);
     }
 
-    /**
-     * 根据课程名称自动分配颜色
-     */
     private String getColorForCourse(String courseName) {
         if (TextUtils.isEmpty(courseName)) {
             return COLOR_PALETTE[0];
@@ -272,7 +274,6 @@ public class CourseTableFragment extends Fragment {
         Course existing = getCourseFromCard(card);
         CourseEditDialogFragment dialog = CourseEditDialogFragment.newInstance(weekday, section, existing);
         dialog.setOnSaveListener(course -> {
-            // 自动分配颜色
             course.setColor(getColorForCourse(course.getName()));
             dbHelper.saveCourse(course);
             CourseReminderHelper.setReminder(requireContext(), course);
@@ -310,7 +311,35 @@ public class CourseTableFragment extends Fragment {
     }
 
     private void showImportOptions() {
-        Toast.makeText(getContext(), "导入功能开发中", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("text/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(Intent.createChooser(intent, "选择课表文件"), REQUEST_CODE_IMPORT_FILE);
+    }
+
+    private void importCoursesFromFile(Uri fileUri) {
+        executor.execute(() -> {
+            try {
+                List<Course> courses = CourseImportHelper.importFromCsv(requireContext(), fileUri);
+                int savedCount = 0;
+                for (Course course : courses) {
+                    course.setColor(getColorForCourse(course.getName()));
+                    dbHelper.saveCourse(course);
+                    CourseReminderHelper.setReminder(requireContext(), course);
+                    savedCount++;
+                }
+                int finalSavedCount = savedCount;
+                mainHandler.post(() -> {
+                    Toast.makeText(getContext(),
+                            "成功导入 " + finalSavedCount + " 门课程", Toast.LENGTH_SHORT).show();
+                    loadCoursesForWeek(currentWeek);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "导入失败", e);
+                mainHandler.post(() -> Toast.makeText(getContext(),
+                        "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void startOcrRecognition() {
@@ -322,32 +351,117 @@ public class CourseTableFragment extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == REQUEST_CODE_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
             Uri imageUri = data.getData();
             if (imageUri != null) {
-                CourseOcrHelper.recognizeText(requireContext(), imageUri, new CourseOcrHelper.OcrCallback() {
+                Toast.makeText(getContext(), "正在识别图片，请稍候...", Toast.LENGTH_SHORT).show();
+
+                CourseOcrHelper.recognizeAndParse(requireContext(), imageUri, new CourseOcrHelper.OcrCallback() {
                     @Override
-                    public void onResult(String rawText) {
-                        parseAndSaveCourses(rawText);
+                    public void onResult(List<Course> fullCourses, List<Course> partialCourses) {
+                        // 完整课程直接保存
+                        if (!fullCourses.isEmpty()) {
+                            executor.execute(() -> {
+                                for (Course course : fullCourses) {
+                                    course.setColor(getColorForCourse(course.getName()));
+                                    dbHelper.saveCourse(course);
+                                    CourseReminderHelper.setReminder(requireContext(), course);
+                                }
+                                mainHandler.post(() -> {
+                                    Toast.makeText(getContext(),
+                                            "自动识别并添加了 " + fullCourses.size() + " 门课程",
+                                            Toast.LENGTH_SHORT).show();
+                                    loadCoursesForWeek(currentWeek);
+                                });
+                            });
+                        }
+
+                        // 部分识别的课程需要用户手动补全信息
+                        if (!partialCourses.isEmpty()) {
+                            showCourseAssignmentDialog(partialCourses);
+                        } else if (fullCourses.isEmpty()) {
+                            Toast.makeText(getContext(),
+                                    "未能从图片中识别出任何课程信息", Toast.LENGTH_LONG).show();
+                        }
                     }
 
                     @Override
                     public void onError(Exception e) {
-                        Toast.makeText(getContext(), "识别失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(),
+                                "识别失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
+            }
+        } else if (requestCode == REQUEST_CODE_IMPORT_FILE && resultCode == RESULT_OK && data != null) {
+            Uri fileUri = data.getData();
+            if (fileUri != null) {
+                importCoursesFromFile(fileUri);
             }
         }
     }
 
-    private void parseAndSaveCourses(String rawText) {
-        // 解析逻辑需根据实际课表格式实现
-        String[] lines = rawText.split("\n");
-        for (String line : lines) {
-            // 示例：调用解析器并保存
+    private void showCourseAssignmentDialog(List<Course> courses) {
+        processNextCourse(courses, 0);
+    }
+
+    private void processNextCourse(List<Course> courses, int index) {
+        if (index >= courses.size()) {
+            Toast.makeText(getContext(), "所有课程已处理完成", Toast.LENGTH_SHORT).show();
+            loadCoursesForWeek(currentWeek);
+            return;
         }
-        Toast.makeText(getContext(), "导入完成", Toast.LENGTH_SHORT).show();
-        loadCoursesForWeek(currentWeek);
+
+        Course course = courses.get(index);
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle("补充课程信息：" + course.getName());
+
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_assign_course, null);
+        Spinner spinnerWeekday = dialogView.findViewById(R.id.spinnerWeekday);
+        Spinner spinnerSection = dialogView.findViewById(R.id.spinnerSection);
+        TextView tvCourseInfo = dialogView.findViewById(R.id.tvCourseInfo);
+
+        String info = "教师：" + (TextUtils.isEmpty(course.getTeacher()) ? "未识别" : course.getTeacher())
+                + "\n教室：" + (TextUtils.isEmpty(course.getClassroom()) ? "未识别" : course.getClassroom());
+        tvCourseInfo.setText(info);
+
+        String[] weekdays = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+        ArrayAdapter<String> weekdayAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, weekdays);
+        weekdayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerWeekday.setAdapter(weekdayAdapter);
+
+        String[] sections = {"第1大节 (1-2节)", "第2大节 (3-4节)", "第3大节 (5-6节)",
+                "第4大节 (7-8节)", "第5大节 (9-10节)"};
+        ArrayAdapter<String> sectionAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, sections);
+        sectionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerSection.setAdapter(sectionAdapter);
+
+        builder.setView(dialogView);
+        builder.setPositiveButton("保存", (dialog, which) -> {
+            int weekday = spinnerWeekday.getSelectedItemPosition() + 1;
+            int section = spinnerSection.getSelectedItemPosition() + 1;
+            course.setWeekday(weekday);
+            course.setSection(section);
+            course.setStartWeek(1);
+            course.setEndWeek(20);
+            course.setColor(getColorForCourse(course.getName()));
+
+            executor.execute(() -> {
+                dbHelper.saveCourse(course);
+                CourseReminderHelper.setReminder(requireContext(), course);
+                mainHandler.post(() -> {
+                    Toast.makeText(getContext(), "已添加：" + course.getName(), Toast.LENGTH_SHORT).show();
+                    processNextCourse(courses, index + 1);
+                });
+            });
+        });
+        builder.setNegativeButton("跳过", (dialog, which) -> processNextCourse(courses, index + 1));
+        builder.setNeutralButton("全部取消", (dialog, which) -> {
+            Toast.makeText(getContext(), "已取消导入剩余课程", Toast.LENGTH_SHORT).show();
+        });
+        builder.show();
     }
 
     private int dpToPx(int dp) {
@@ -357,5 +471,11 @@ public class CourseTableFragment extends Fragment {
     private boolean isColorDark(int color) {
         double darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
         return darkness >= 0.5;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        executor.shutdown();
     }
 }
